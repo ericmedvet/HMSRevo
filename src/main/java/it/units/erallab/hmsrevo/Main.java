@@ -82,11 +82,11 @@ public class Main extends Worker {
     //prepare episodes
     Map<String, double[][]> namedTerrainProfiles = new LinkedHashMap<>();
     namedTerrainProfiles.put("flat", new double[][]{new double[]{0, 1, 1999, 2000}, new double[]{30, 0, 0, 30}});
-    namedTerrainProfiles.put("uneven-10", randomTerrain(20, 2000, 10, 30, random));
+    namedTerrainProfiles.put("uneven10", randomTerrain(20, 2000, 10, 30, random));
     //read parameters
     int[] runs = ri(a("runs", "0:10"));
     List<String> shapeNames = l(a("shapes", "worm"));
-    List<String> terrainNames = l(a("terrains", "flat,uneve-10"));
+    List<String> terrainNames = l(a("terrains", "flat,uneven10"));
     double finalT = d(a("finalT", "10"));
     double minDT = d(a("minDT", "0.02"));
     double maxDT = d(a("maxDT", "0.2"));
@@ -123,6 +123,8 @@ public class Main extends Worker {
           //prepare keys
           Map<String, String> keys = new LinkedHashMap<>();
           keys.put("run", Integer.toString(run));
+          keys.put("n.pop", Integer.toString(nPop));
+          keys.put("driving.frequency", Double.toString(drivingFrequency));
           keys.put("shape", shapeName);
           keys.put("terrain", terrainName);
           keys.put("metrics", Arrays.stream(metrics).map((m) -> m.toString().toLowerCase().replace("_", ".")).collect(Collectors.joining("/")));
