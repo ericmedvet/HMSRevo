@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
  *
  * @author Eric Medvet <eric.medvet@gmail.com>
  */
-public class LocomotionProblem implements TunablePrecisionProblem<VoxelCompound, List<Double>> {
+public class LocomotionProblem implements TunablePrecisionProblem<VoxelCompound.Description, List<Double>> {
 
   public static enum ApproximationMethod {
     FINAL_T, DT
@@ -57,17 +57,17 @@ public class LocomotionProblem implements TunablePrecisionProblem<VoxelCompound,
   }
 
   @Override
-  public NonDeterministicBiFunction<VoxelCompound, Double, List<Double>> getTunablePrecisionFitnessFunction() {
+  public NonDeterministicBiFunction<VoxelCompound.Description, Double, List<Double>> getTunablePrecisionFitnessFunction() {
     return getTunablePrecisionFitnessFunction(metrics);
   }
 
   @Override
-  public NonDeterministicFunction<VoxelCompound, List<Double>> getFitnessFunction() {        
+  public NonDeterministicFunction<VoxelCompound.Description, List<Double>> getFitnessFunction() {        
     return getFitnessFunction(metrics);
   }
 
-  private NonDeterministicBiFunction<VoxelCompound, Double, List<Double>> getTunablePrecisionFitnessFunction(Locomotion.Metric... localMetrics) {
-    return (VoxelCompound vc, Double p, Random random, Listener listener) -> {
+  private NonDeterministicBiFunction<VoxelCompound.Description, Double, List<Double>> getTunablePrecisionFitnessFunction(Locomotion.Metric... localMetrics) {
+    return (VoxelCompound.Description vcd, Double p, Random random, Listener listener) -> {
       double dT = minDT;
       double finalT = maxFinalT;
       if (approximationMethod.equals(ApproximationMethod.FINAL_T)) {
@@ -76,7 +76,7 @@ public class LocomotionProblem implements TunablePrecisionProblem<VoxelCompound,
         dT = minDT + p * (maxDT - minDT);
       }
       Locomotion locomotion = new Locomotion(finalT, groundProfile, localMetrics);
-      locomotion.init(vc.clone()); //because world objects cannot be reused
+      locomotion.init(vcd);
       while (!locomotion.isDone()) {
         locomotion.step(dT, false);
       }
@@ -88,11 +88,11 @@ public class LocomotionProblem implements TunablePrecisionProblem<VoxelCompound,
     };
   }
   
-  public Function<VoxelCompound, List<Double>> getFitnessFunction(Locomotion.Metric... localMetrics) {
-    NonDeterministicBiFunction<VoxelCompound, Double, List<Double>> f = getTunablePrecisionFitnessFunction(localMetrics);
+  public Function<VoxelCompound.Description, List<Double>> getFitnessFunction(Locomotion.Metric... localMetrics) {
+    NonDeterministicBiFunction<VoxelCompound.Description, Double, List<Double>> f = getTunablePrecisionFitnessFunction(localMetrics);
     Random random = new Random(1);
-    return (VoxelCompound vc, Listener listener) -> {
-      return f.apply(vc, 0d, random, listener);
+    return (VoxelCompound.Description vcd, Listener listener) -> {
+      return f.apply(vcd, 0d, random, listener);
     };    
   }
 
