@@ -24,14 +24,11 @@ import it.units.erallab.hmsrobots.objects.VoxelCompound;
 import it.units.erallab.hmsrobots.problems.Locomotion;
 import it.units.erallab.hmsrobots.util.Grid;
 import it.units.malelab.jgea.Worker;
-import it.units.malelab.jgea.core.Problem;
 import it.units.malelab.jgea.core.Sequence;
 import it.units.malelab.jgea.core.evolver.Evolver;
 import it.units.malelab.jgea.core.evolver.MutationOnly;
 import it.units.malelab.jgea.core.evolver.stopcondition.FitnessEvaluations;
-import it.units.malelab.jgea.core.function.CachedFunction;
 import it.units.malelab.jgea.core.function.Function;
-import it.units.malelab.jgea.core.function.FunctionException;
 import it.units.malelab.jgea.core.genotype.DoubleSequenceFactory;
 import it.units.malelab.jgea.core.listener.Listener;
 import it.units.malelab.jgea.core.listener.MultiFileListenerFactory;
@@ -39,14 +36,11 @@ import it.units.malelab.jgea.core.listener.collector.Basic;
 import it.units.malelab.jgea.core.listener.collector.BestInfo;
 import it.units.malelab.jgea.core.listener.collector.Diversity;
 import it.units.malelab.jgea.core.listener.collector.FunctionOfBest;
-import it.units.malelab.jgea.core.listener.collector.Item;
 import it.units.malelab.jgea.core.listener.collector.Population;
 import it.units.malelab.jgea.core.listener.collector.Static;
 import it.units.malelab.jgea.core.operator.GaussianMutation;
 import it.units.malelab.jgea.core.ranker.ParetoRanker;
-import it.units.malelab.jgea.problem.surrogate.TunablePrecisionProblem;
 import java.io.FileNotFoundException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -87,13 +81,13 @@ public class Main extends Worker {
     int[] runs = ri(a("runs", "0:10"));
     List<String> shapeNames = l(a("shapes", "worm"));
     List<String> terrainNames = l(a("terrains", "flat,uneven10"));
-    double finalT = d(a("finalT", "10"));
+    double finalT = d(a("finalT", "30"));
     double minDT = d(a("minDT", "0.02"));
     double maxDT = d(a("maxDT", "0.2"));
     double drivingFrequency = d(a("drivingF", "1"));
-    int nPop = i(a("npop", "10"));
+    int nPop = i(a("npop", "100"));
     int nEvaluations = i(a("nev", "10000"));
-    Locomotion.Metric[] metrics = new Locomotion.Metric[]{Locomotion.Metric.TRAVELLED_X_DIST};
+    Locomotion.Metric[] metrics = new Locomotion.Metric[]{Locomotion.Metric.TRAVEL_X_VELOCITY};
     //prepare things
     MultiFileListenerFactory listenerFactory = new MultiFileListenerFactory(a("dir", "."), a("file", null));
     //iterate   
@@ -115,7 +109,7 @@ public class Main extends Worker {
                   new DoubleSequenceFactory(-1, 1, voxels),
                   new ParetoRanker<>(false),
                   getPhaseSinMapper(shape, drivingFrequency),
-                  new GaussianMutation(0.1),
+                  new GaussianMutation(0.25),
                   Lists.newArrayList(new FitnessEvaluations(nEvaluations)),
                   0,
                   false
@@ -132,7 +126,7 @@ public class Main extends Worker {
           //run evolver
           Random r = new Random(run);
           try {
-            evolver.solve(problem, r, executorService, Listener.onExecutor(listener(
+            evolver.solve(problem, r, executorService, Listener.onExecutor(listenerFactory.build(
                     new Static(keys),
                     new Basic(),
                     new Population(),
@@ -166,7 +160,7 @@ public class Main extends Worker {
         }
       }
       Controller controller = new PhaseSin(frequency, 1d, phases);
-      VoxelCompound vc = new VoxelCompound(0d, 0d, shape, controller, Voxel.Builder.create());
+      VoxelCompound vc = new VoxelCompound(0d, 0d, new VoxelCompound.Description(shape, controller, Voxel.Builder.create()));
       return vc;
     };
   }
