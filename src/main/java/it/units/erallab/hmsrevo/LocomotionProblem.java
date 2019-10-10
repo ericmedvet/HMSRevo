@@ -16,14 +16,13 @@
  */
 package it.units.erallab.hmsrevo;
 
+import it.units.erallab.hmsrobots.Snapshot;
 import it.units.erallab.hmsrobots.objects.VoxelCompound;
 import it.units.erallab.hmsrobots.problems.Locomotion;
 import it.units.malelab.jgea.core.function.Function;
-import it.units.malelab.jgea.core.function.FunctionException;
 import it.units.malelab.jgea.core.function.NonDeterministicBiFunction;
 import it.units.malelab.jgea.core.function.NonDeterministicFunction;
 import it.units.malelab.jgea.core.listener.Listener;
-import it.units.malelab.jgea.core.util.WithNames;
 import it.units.malelab.jgea.problem.surrogate.TunablePrecisionProblem;
 import java.util.Arrays;
 import java.util.List;
@@ -78,7 +77,12 @@ public class LocomotionProblem implements TunablePrecisionProblem<VoxelCompound.
       Locomotion locomotion = new Locomotion(finalT, groundProfile, localMetrics);
       locomotion.init(vcd);
       while (!locomotion.isDone()) {
-        locomotion.step(dT, false);
+        if (listener instanceof BridgeListener) {
+          Snapshot snapshot = locomotion.step(dT, true);
+          listener.listen(new BridgeListener.SnapshotEvent(snapshot));
+        } else {
+          locomotion.step(dT, false);
+        }
       }
       double[] metricValues = locomotion.getMetrics();
       for (int i = 0; i<metricValues.length; i++) {

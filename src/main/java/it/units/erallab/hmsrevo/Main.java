@@ -82,10 +82,6 @@ public class Main extends Worker {
     namedShapes.put("worm", createShape(new int[]{11, 4}));
     namedShapes.put("biped", createShape(new int[]{11, 4}, new int[]{2, 2, 9, 4}));
     namedShapes.put("tripod", createShape(new int[]{11, 4}, new int[]{2, 2, 5, 4}, new int[]{7, 2, 9, 4}));
-    //prepare episodes
-    Map<String, double[][]> namedTerrainProfiles = new LinkedHashMap<>();
-    namedTerrainProfiles.put("flat", new double[][]{new double[]{0, 1, 1999, 2000}, new double[]{30, 0, 0, 30}});
-    namedTerrainProfiles.put("uneven10", randomTerrain(20, 2000, 10, 30, random));
     //read parameters
     int[] runs = ri(a("runs", "0:10"));
     List<String> shapeNames = l(a("shapes", "biped,worm,biped,tripod"));
@@ -108,7 +104,7 @@ public class Main extends Worker {
             //build problem
             LocomotionProblem problem = new LocomotionProblem(
                     finalT, minDT, maxDT,
-                    namedTerrainProfiles.get(terrainName), metrics,
+                    createTerrain(terrainName), metrics,
                     LocomotionProblem.ApproximationMethod.FINAL_T
             );
             PrecisionController<VoxelCompound.Description> pController = null;
@@ -211,7 +207,7 @@ public class Main extends Worker {
     return shape;
   }
 
-  private double[][] randomTerrain(int n, double length, double peak, double borderHeight, Random random) {
+  private static double[][] randomTerrain(int n, double length, double peak, double borderHeight, Random random) {
     double[] xs = new double[n + 2];
     double[] ys = new double[n + 2];
     xs[0] = 0d;
@@ -223,6 +219,17 @@ public class Main extends Worker {
       ys[i] = random.nextDouble() * peak;
     }
     return new double[][]{xs, ys};
+  }
+  
+  public static double[][] createTerrain(String name) {
+    Random random = new Random(1);
+    if (name.equals("flat")) {
+      return new double[][]{new double[]{0, 1, 1999, 2000}, new double[]{30, 0, 0, 30}};
+    } else if (name.startsWith("uneven")) {
+      int h = Integer.parseInt(name.replace("uneven", ""));
+      return randomTerrain(20, 2000, h, 30, random);
+    }
+    return null;
   }
 
 }
