@@ -30,16 +30,12 @@ import it.units.malelab.jgea.core.Sequence;
 import it.units.malelab.jgea.core.evolver.Evolver;
 import it.units.malelab.jgea.core.evolver.MutationOnly;
 import it.units.malelab.jgea.core.evolver.stopcondition.ElapsedTime;
-import it.units.malelab.jgea.core.evolver.stopcondition.FitnessEvaluations;
 import it.units.malelab.jgea.core.function.Function;
-import it.units.malelab.jgea.core.function.FunctionException;
 import it.units.malelab.jgea.core.genotype.DoubleSequenceFactory;
 import it.units.malelab.jgea.core.listener.Listener;
 import it.units.malelab.jgea.core.listener.MultiFileListenerFactory;
 import it.units.malelab.jgea.core.listener.collector.Basic;
 import it.units.malelab.jgea.core.listener.collector.BestInfo;
-import it.units.malelab.jgea.core.listener.collector.DataCollector;
-import it.units.malelab.jgea.core.listener.collector.Diversity;
 import it.units.malelab.jgea.core.listener.collector.FunctionOfBest;
 import it.units.malelab.jgea.core.listener.collector.FunctionOfEvent;
 import it.units.malelab.jgea.core.listener.collector.Population;
@@ -88,7 +84,7 @@ public class Main extends Worker {
     namedTerrainProfiles.put("uneven10", randomTerrain(20, 2000, 10, 30, random));
     //read parameters
     int[] runs = ri(a("runs", "0:10"));
-    List<String> shapeNames = l(a("shapes", "biped,worm,biped,tripod"));
+    List<String> shapeNames = l(a("shapes", "worm,biped,tripod"));
     List<String> terrainNames = l(a("terrains", "flat"));
     List<String> pControllerNames = l(a("pController", "static-0,static-0.5,linear-0.5-0-1.0"));
     double finalT = d(a("finalT", "30"));
