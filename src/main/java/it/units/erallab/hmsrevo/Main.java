@@ -31,6 +31,7 @@ import it.units.malelab.jgea.core.evolver.Evolver;
 import it.units.malelab.jgea.core.evolver.MutationOnly;
 import it.units.malelab.jgea.core.evolver.stopcondition.ElapsedTime;
 import it.units.malelab.jgea.core.function.Function;
+import it.units.malelab.jgea.core.function.FunctionException;
 import it.units.malelab.jgea.core.genotype.DoubleSequenceFactory;
 import it.units.malelab.jgea.core.listener.Listener;
 import it.units.malelab.jgea.core.listener.MultiFileListenerFactory;
@@ -43,6 +44,7 @@ import it.units.malelab.jgea.core.listener.collector.Static;
 import it.units.malelab.jgea.core.operator.GaussianMutation;
 import it.units.malelab.jgea.core.ranker.ParetoRanker;
 import it.units.malelab.jgea.core.util.Pair;
+import it.units.malelab.jgea.distance.Distance;
 import it.units.malelab.jgea.problem.surrogate.ControlledPrecisionProblem;
 import java.io.FileNotFoundException;
 import java.util.Arrays;
@@ -82,7 +84,7 @@ public class Main extends Worker {
     int[] runs = ri(a("runs", "0:10"));
     List<String> shapeNames = l(a("shapes", "worm,biped,tripod"));
     List<String> terrainNames = l(a("terrains", "flat"));
-    List<String> pControllerNames = l(a("pController", "static-0,static-0.5,linear-0.5-0-1.0"));
+    List<String> pControllerNames = l(a("pController", "linear-0.5-0-25000,linear-0.95-0-25000,min"));
     double finalT = d(a("finalT", "30"));
     double minDT = d(a("minDT", "0.01"));
     double maxDT = d(a("maxDT", "0.2"));
@@ -92,6 +94,23 @@ public class Main extends Worker {
     Locomotion.Metric[] metrics = new Locomotion.Metric[]{Locomotion.Metric.TRAVEL_X_VELOCITY};
     //prepare things
     MultiFileListenerFactory listenerFactory = new MultiFileListenerFactory(a("dir", "."), a("file", null));
+    Distance<VoxelCompound.Description> solutionDistance = new Distance<VoxelCompound.Description>() {
+      @Override
+      public Double apply(VoxelCompound.Description vcd1, VoxelCompound.Description vcd2, Listener listener) throws FunctionException {
+        PhaseSin ps1 = (PhaseSin)vcd1.getController();
+        PhaseSin ps2 = (PhaseSin)vcd2.getController();
+        List<Double> phases1 = ps1.getFunctions().values().stream().filter(f -> f!=null).map(f -> Math.asin(f.apply(0d))).collect(Collectors.toList());
+        List<Double> phases2 = ps2.getFunctions().values().stream().filter(f -> f!=null).map(f -> Math.asin(f.apply(0d))).collect(Collectors.toList());
+        //synch phases
+        double avgDiff = phases1.stream().mapToDouble(d -> d).average().getAsDouble()-phases2.stream().mapToDouble(d -> d).average().getAsDouble();
+        //compute avg squared diff
+        double diff = 0d;
+        for (int i = 0; i<Math.min(phases1.size(), phases2.size()); i++) {
+          diff = diff+Math.pow(phases1.get(i)-phases2.get(i)-avgDiff, 2d);
+        }        
+        return Math.sqrt(diff)/Math.min(phases1.size(), phases2.size());
+      }
+    };
     //iterate   
     for (int run : runs) {
       for (String shapeName : shapeNames) {
@@ -112,7 +131,20 @@ public class Main extends Worker {
               pController = new SurrogatePrecisionControl.LinearController<>(
                       d(p(pControllerName, 1)),
                       d(p(pControllerName, 2)),
-                      (int) Math.round((double) 2000 / d(p(pControllerName, 3)))
+                      i(p(pControllerName, 3))
+              );
+            } else if (pControllerName.startsWith("avgDistRatio")) {
+              pController = new SurrogatePrecisionControl.HistoricAvgDistanceRatio<>(
+                      d(p(pControllerName, 1)),
+                      i(p(pControllerName, 2)),
+                      solutionDistance,
+                      i(p(pControllerName, 3))
+              );
+            } else if (pControllerName.startsWith("min")) {
+              pController = new SurrogatePrecisionControl.MinOfPrecisions<>(
+                      100,
+                      new SurrogatePrecisionControl.LinearController<>(0.95d,0d,25000),
+                      new SurrogatePrecisionControl.HistoricAvgDistanceRatio<>(0.95d , 5, solutionDistance, 100)
               );
             }
             ControlledPrecisionProblem<VoxelCompound.Description, List<Double>> cpProblem = new ControlledPrecisionProblem<>(
@@ -216,7 +248,7 @@ public class Main extends Worker {
     }
     return new double[][]{xs, ys};
   }
-  
+
   public static double[][] createTerrain(String name) {
     Random random = new Random(1);
     if (name.equals("flat")) {
