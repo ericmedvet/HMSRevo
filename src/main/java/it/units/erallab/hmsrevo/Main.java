@@ -29,6 +29,7 @@ import it.units.malelab.jgea.core.PrecisionController;
 import it.units.malelab.jgea.core.Sequence;
 import it.units.malelab.jgea.core.evolver.Evolver;
 import it.units.malelab.jgea.core.evolver.MutationOnly;
+import it.units.malelab.jgea.core.evolver.StandardEvolver;
 import it.units.malelab.jgea.core.evolver.stopcondition.ElapsedTime;
 import it.units.malelab.jgea.core.function.Function;
 import it.units.malelab.jgea.core.function.FunctionException;
@@ -42,7 +43,11 @@ import it.units.malelab.jgea.core.listener.collector.FunctionOfEvent;
 import it.units.malelab.jgea.core.listener.collector.Population;
 import it.units.malelab.jgea.core.listener.collector.Static;
 import it.units.malelab.jgea.core.operator.GaussianMutation;
+import it.units.malelab.jgea.core.operator.GeneticOperator;
+import it.units.malelab.jgea.core.operator.SegmentCrossover;
 import it.units.malelab.jgea.core.ranker.ParetoRanker;
+import it.units.malelab.jgea.core.ranker.selector.Tournament;
+import it.units.malelab.jgea.core.ranker.selector.Worst;
 import it.units.malelab.jgea.core.util.Pair;
 import it.units.malelab.jgea.distance.Distance;
 import it.units.malelab.jgea.problem.surrogate.ControlledPrecisionProblem;
@@ -74,7 +79,6 @@ public class Main extends Worker {
 
   @Override
   public void run() {
-    Random random = new Random(1);
     //prepare shapes
     Map<String, Grid<Boolean>> namedShapes = new LinkedHashMap<>();
     namedShapes.put("worm", createShape(new int[]{11, 4}));
@@ -84,31 +88,33 @@ public class Main extends Worker {
     int[] runs = ri(a("runs", "0:10"));
     List<String> shapeNames = l(a("shapes", "worm,biped,tripod"));
     List<String> terrainNames = l(a("terrains", "flat"));
-    List<String> pControllerNames = l(a("pController", "linear-0.5-0-25000,linear-0.95-0-25000,min"));
+    List<String> pControllerNames = l(a("pController", "static-0,linear-0.95-0-25000,min"));
+    List<String> evolverNames = l(a("evolver", "mutationOnly,standard"));
+    List<String> approximationMethodNames = l(a("approxMethod", "finalT,dT"));
     double finalT = d(a("finalT", "30"));
     double minDT = d(a("minDT", "0.01"));
     double maxDT = d(a("maxDT", "0.2"));
     double drivingFrequency = d(a("drivingF", "-1"));
     int nPop = i(a("npop", "100"));
-    double maxElapsed = d(a("maxElapsed", "60"));
+    double maxElapsed = d(a("maxElapsed", "30"));
     Locomotion.Metric[] metrics = new Locomotion.Metric[]{Locomotion.Metric.TRAVEL_X_VELOCITY};
     //prepare things
     MultiFileListenerFactory listenerFactory = new MultiFileListenerFactory(a("dir", "."), a("file", null));
     Distance<VoxelCompound.Description> solutionDistance = new Distance<VoxelCompound.Description>() {
       @Override
       public Double apply(VoxelCompound.Description vcd1, VoxelCompound.Description vcd2, Listener listener) throws FunctionException {
-        PhaseSin ps1 = (PhaseSin)vcd1.getController();
-        PhaseSin ps2 = (PhaseSin)vcd2.getController();
-        List<Double> phases1 = ps1.getFunctions().values().stream().filter(f -> f!=null).map(f -> Math.asin(f.apply(0d))).collect(Collectors.toList());
-        List<Double> phases2 = ps2.getFunctions().values().stream().filter(f -> f!=null).map(f -> Math.asin(f.apply(0d))).collect(Collectors.toList());
+        PhaseSin ps1 = (PhaseSin) vcd1.getController();
+        PhaseSin ps2 = (PhaseSin) vcd2.getController();
+        List<Double> phases1 = ps1.getFunctions().values().stream().filter(f -> f != null).map(f -> Math.asin(f.apply(0d))).collect(Collectors.toList());
+        List<Double> phases2 = ps2.getFunctions().values().stream().filter(f -> f != null).map(f -> Math.asin(f.apply(0d))).collect(Collectors.toList());
         //synch phases
-        double avgDiff = phases1.stream().mapToDouble(d -> d).average().getAsDouble()-phases2.stream().mapToDouble(d -> d).average().getAsDouble();
+        double avgDiff = phases1.stream().mapToDouble(d -> d).average().getAsDouble() - phases2.stream().mapToDouble(d -> d).average().getAsDouble();
         //compute avg squared diff
         double diff = 0d;
-        for (int i = 0; i<Math.min(phases1.size(), phases2.size()); i++) {
-          diff = diff+Math.pow(phases1.get(i)-phases2.get(i)-avgDiff, 2d);
-        }        
-        return Math.sqrt(diff)/Math.min(phases1.size(), phases2.size());
+        for (int i = 0; i < Math.min(phases1.size(), phases2.size()); i++) {
+          diff = diff + Math.pow(phases1.get(i) - phases2.get(i) - avgDiff, 2d);
+        }
+        return Math.sqrt(diff) / Math.min(phases1.size(), phases2.size());
       }
     };
     //iterate   
@@ -116,91 +122,118 @@ public class Main extends Worker {
       for (String shapeName : shapeNames) {
         for (String terrainName : terrainNames) {
           for (String pControllerName : pControllerNames) {
-            //build problem
-            LocomotionProblem problem = new LocomotionProblem(
-                    finalT, minDT, maxDT,
-                    createTerrain(terrainName), metrics,
-                    LocomotionProblem.ApproximationMethod.FINAL_T
-            );
-            PrecisionController<VoxelCompound.Description> pController = null;
-            if (pControllerName.startsWith("static")) {
-              pController = new SurrogatePrecisionControl.StaticController<>(
-                      d(p(pControllerName, 1))
-              );
-            } else if (pControllerName.startsWith("linear")) {
-              pController = new SurrogatePrecisionControl.LinearController<>(
-                      d(p(pControllerName, 1)),
-                      d(p(pControllerName, 2)),
-                      i(p(pControllerName, 3))
-              );
-            } else if (pControllerName.startsWith("avgDistRatio")) {
-              pController = new SurrogatePrecisionControl.HistoricAvgDistanceRatio<>(
-                      d(p(pControllerName, 1)),
-                      i(p(pControllerName, 2)),
-                      solutionDistance,
-                      i(p(pControllerName, 3))
-              );
-            } else if (pControllerName.startsWith("min")) {
-              pController = new SurrogatePrecisionControl.MinOfPrecisions<>(
-                      100,
-                      new SurrogatePrecisionControl.LinearController<>(0.95d,0d,25000),
-                      new SurrogatePrecisionControl.HistoricAvgDistanceRatio<>(0.95d , 5, solutionDistance, 100)
-              );
-            }
-            ControlledPrecisionProblem<VoxelCompound.Description, List<Double>> cpProblem = new ControlledPrecisionProblem<>(
-                    problem,
-                    pController
-            );
-            //prepare robot related things
-            Grid<Boolean> shape = namedShapes.get(shapeName);
-            int voxels = (int) shape.values().stream().filter((b) -> b).count();
-            //prepare evolver
-            Evolver<Sequence<Double>, VoxelCompound.Description, List<Double>> evolver = new MutationOnly<>(
-                    nPop,
-                    new DoubleSequenceFactory(-Math.PI, Math.PI, voxels),
-                    new ParetoRanker<>(false),
-                    getPhaseSinMapper(shape, drivingFrequency),
-                    new GaussianMutation(0.25),
-                    Lists.newArrayList(new ElapsedTime(maxElapsed, TimeUnit.MINUTES)),
-                    0,
-                    false
-            );
-            //prepare keys
-            Map<String, String> keys = new LinkedHashMap<>();
-            keys.put("run", Integer.toString(run));
-            keys.put("n.pop", Integer.toString(nPop));
-            keys.put("driving.frequency", Double.toString(drivingFrequency));
-            keys.put("shape", shapeName);
-            keys.put("terrain", terrainName);
-            keys.put("precision.controller", pControllerName);
-            keys.put("metrics", Arrays.stream(metrics).map((m) -> m.toString().toLowerCase().replace("_", ".")).collect(Collectors.joining("/")));
-            System.out.println(keys);
-            //run evolver
-            Random r = new Random(run);
-            try {
-              evolver.solve(cpProblem, r, executorService, Listener.onExecutor(listenerFactory.build(
-                      new Static(keys),
-                      new Basic(),
-                      new Population(),
-                      new BestInfo<>(problem.getFitnessFunction(metrics), "%+5.1f"),
-                      new FunctionOfEvent<>("sum.precisions", (e, l) -> cpProblem.getController().getSumOfPrecisions(), "%8.4f"),
-                      new FunctionOfEvent<>("calls", (e, l) -> cpProblem.getController().getCalls(), "%7d"),
-                      new FunctionOfEvent<>("history.avg.precision", (e, l) -> cpProblem.getController().getHistory().stream().mapToDouble((o) -> ((Double) ((Pair) o).second()).doubleValue()).average().orElse(Double.NaN), "%5.3f"),
-                      FunctionOfBest.create(
-                              "valid",
-                              problem.getFitnessFunction(Locomotion.Metric.values()),
-                              Arrays.stream(Locomotion.Metric.values()).map((m) -> {
-                                return m.toString().toLowerCase().replace('_', '.');
-                              }).collect(Collectors.toList()),
-                              Collections.nCopies(Locomotion.Metric.values().length, "%+5.1f"),
-                              0
-                      ),
-                      new FunctionOfBest<>("serialized", (VoxelCompound.Description vcd, Listener l) -> {
-                        return Util.lazilySerialize(vcd);
-                      }, 0, "%s")
-              ), executorService));
-            } catch (InterruptedException | ExecutionException ex) {
-              L.log(Level.SEVERE, String.format("Cannot solve problem: %s", ex), ex);
+            for (String evolverName : evolverNames) {
+              for (String approximationMethodName : approximationMethodNames) {
+                //build problem                
+                LocomotionProblem problem = new LocomotionProblem(
+                        finalT, minDT, maxDT,
+                        createTerrain(terrainName), metrics,
+                        approximationMethodName.equals("finalT")?LocomotionProblem.ApproximationMethod.FINAL_T:LocomotionProblem.ApproximationMethod.DT
+                );
+                PrecisionController<VoxelCompound.Description> pController = null;
+                if (pControllerName.startsWith("static")) {
+                  pController = new SurrogatePrecisionControl.StaticController<>(
+                          d(p(pControllerName, 1))
+                  );
+                } else if (pControllerName.startsWith("linear")) {
+                  pController = new SurrogatePrecisionControl.LinearController<>(
+                          d(p(pControllerName, 1)),
+                          d(p(pControllerName, 2)),
+                          i(p(pControllerName, 3))
+                  );
+                } else if (pControllerName.startsWith("avgDistRatio")) {
+                  pController = new SurrogatePrecisionControl.HistoricAvgDistanceRatio<>(
+                          d(p(pControllerName, 1)),
+                          i(p(pControllerName, 2)),
+                          solutionDistance,
+                          i(p(pControllerName, 3))
+                  );
+                } else if (pControllerName.startsWith("min")) {
+                  pController = new SurrogatePrecisionControl.MinOfPrecisions<>(
+                          100,
+                          new SurrogatePrecisionControl.LinearController<>(0.95d, 0d, 25000),
+                          new SurrogatePrecisionControl.HistoricAvgDistanceRatio<>(0.95d, 5, solutionDistance, 100)
+                  );
+                }
+                ControlledPrecisionProblem<VoxelCompound.Description, List<Double>> cpProblem = new ControlledPrecisionProblem<>(
+                        problem,
+                        pController
+                );
+                //prepare robot related things
+                Grid<Boolean> shape = namedShapes.get(shapeName);
+                int voxels = (int) shape.values().stream().filter((b) -> b).count();
+                //prepare evolver
+                Evolver<Sequence<Double>, VoxelCompound.Description, List<Double>> evolver = null;
+                if (evolverName.equals("mutationOnly")) {
+                  evolver = new MutationOnly<>(
+                          nPop,
+                          new DoubleSequenceFactory(-Math.PI, Math.PI, voxels),
+                          new ParetoRanker<>(false),
+                          getPhaseSinMapper(shape, drivingFrequency),
+                          new GaussianMutation(0.25),
+                          Lists.newArrayList(new ElapsedTime(maxElapsed, TimeUnit.MINUTES)),
+                          0,
+                          false
+                  );
+                } else if (evolverName.equals("standard")) {
+                  Map<GeneticOperator<Sequence<Double>>, Double> operators = new LinkedHashMap<>();
+                  operators.put(new SegmentCrossover(), 0.8d);
+                  operators.put(new GaussianMutation(0.25d), 0.2d);
+                  evolver = new StandardEvolver<>(
+                          nPop,
+                          new DoubleSequenceFactory(-Math.PI, Math.PI, voxels),
+                          new ParetoRanker<>(false),
+                          getPhaseSinMapper(shape, drivingFrequency),
+                          operators,
+                          new Tournament<>(3),
+                          new Worst(),
+                          nPop,
+                          false,
+                          Lists.newArrayList(new ElapsedTime(maxElapsed, TimeUnit.MINUTES)),
+                          0,
+                          false
+                  );
+                }
+                //prepare keys
+                Map<String, String> keys = new LinkedHashMap<>();
+                keys.put("evolver", evolverName);
+                keys.put("approx.method", approximationMethodName);
+                keys.put("run", Integer.toString(run));
+                keys.put("n.pop", Integer.toString(nPop));
+                keys.put("driving.frequency", Double.toString(drivingFrequency));
+                keys.put("shape", shapeName);
+                keys.put("terrain", terrainName);
+                keys.put("precision.controller", pControllerName);
+                keys.put("metrics", Arrays.stream(metrics).map((m) -> m.toString().toLowerCase().replace("_", ".")).collect(Collectors.joining("/")));
+                System.out.println(keys);
+                //run evolver
+                Random r = new Random(run);
+                try {
+                  evolver.solve(cpProblem, r, executorService, Listener.onExecutor(listenerFactory.build(
+                          new Static(keys),
+                          new Basic(),
+                          new Population(),
+                          new BestInfo<>(problem.getFitnessFunction(metrics), "%+5.1f"),
+                          new FunctionOfEvent<>("sum.precisions", (e, l) -> cpProblem.getController().getSumOfPrecisions(), "%8.4f"),
+                          new FunctionOfEvent<>("calls", (e, l) -> cpProblem.getController().getCalls(), "%7d"),
+                          new FunctionOfEvent<>("history.avg.precision", (e, l) -> cpProblem.getController().getHistory().stream().mapToDouble((o) -> ((Double) ((Pair) o).second()).doubleValue()).average().orElse(Double.NaN), "%5.3f"),
+                          FunctionOfBest.create(
+                                  "valid",
+                                  problem.getFitnessFunction(Locomotion.Metric.values()),
+                                  Arrays.stream(Locomotion.Metric.values()).map((m) -> {
+                                    return m.toString().toLowerCase().replace('_', '.');
+                                  }).collect(Collectors.toList()),
+                                  Collections.nCopies(Locomotion.Metric.values().length, "%+5.1f"),
+                                  0
+                          ),
+                          new FunctionOfBest<>("serialized", (VoxelCompound.Description vcd, Listener l) -> {
+                            return Util.lazilySerialize(vcd);
+                          }, 0, "%s")
+                  ), executorService));
+                } catch (InterruptedException | ExecutionException ex) {
+                  L.log(Level.SEVERE, String.format("Cannot solve problem: %s", ex), ex);
+                }
+              }
             }
           }
         }
