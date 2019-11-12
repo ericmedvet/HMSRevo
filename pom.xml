@@ -3,18 +3,18 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>it.units.erallab</groupId>
     <artifactId>HMSREvo</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.9.0</version>
     <packaging>jar</packaging>
     <dependencies>
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>TwoDimHighlyModularSoftRobots</artifactId>
-            <version>${project.version}</version>
-        </dependency>
         <dependency>
             <groupId>it.units.malelab</groupId>
             <artifactId>JGEA</artifactId>
             <version>1.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>it.units.erallab</groupId>
+            <artifactId>TwoDimHighlyModularSoftRobots</artifactId>
+            <version>0.4.0</version>
         </dependency>
     </dependencies>
     <properties>
@@ -23,24 +23,24 @@
         <maven.compiler.target>11</maven.compiler.target>
     </properties>
 
-  <!-- http://www.mkyong.com/maven/create-a-fat-jar-file-maven-shade-plugin/ -->
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-shade-plugin</artifactId>
-        <version>2.3</version>
-        <executions>
-          <!-- Run shade goal on package phase -->
-          <execution>
-            <phase>package</phase>
-            <goals>
-              <goal>shade</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-    </plugins>
-  </build>
+    <!-- http://www.mkyong.com/maven/create-a-fat-jar-file-maven-shade-plugin/ -->
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>2.3</version>
+                <executions>
+                    <!-- Run shade goal on package phase -->
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>

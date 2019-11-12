@@ -16,7 +16,6 @@
  */
 package it.units.erallab.hmsrevo;
 
-import it.units.erallab.hmsrobots.Snapshot;
 import it.units.erallab.hmsrobots.objects.VoxelCompound;
 import it.units.erallab.hmsrobots.problems.Locomotion;
 import it.units.malelab.jgea.core.function.Function;
@@ -28,6 +27,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
+import org.dyn4j.dynamics.Settings;
 
 /**
  *
@@ -43,10 +43,10 @@ public class LocomotionProblem implements TunablePrecisionProblem<VoxelCompound.
   private final double minDT;
   private final double maxDT;
   private final double[][] groundProfile;
-  private final Locomotion.Metric[] metrics;
+  private final List<Locomotion.Metric> metrics;
   private final ApproximationMethod approximationMethod;
 
-  public LocomotionProblem(double maxFinalT, double minDT, double maxDT, double[][] groundProfile, Locomotion.Metric[] metrics, ApproximationMethod approximationMethod) {
+  public LocomotionProblem(double maxFinalT, double minDT, double maxDT, double[][] groundProfile, List<Locomotion.Metric> metrics, ApproximationMethod approximationMethod) {
     this.maxFinalT = maxFinalT;
     this.minDT = minDT;
     this.maxDT = maxDT;
@@ -65,7 +65,7 @@ public class LocomotionProblem implements TunablePrecisionProblem<VoxelCompound.
     return getFitnessFunction(metrics);
   }
 
-  private NonDeterministicBiFunction<VoxelCompound.Description, Double, List<Double>> getTunablePrecisionFitnessFunction(Locomotion.Metric... localMetrics) {
+  private NonDeterministicBiFunction<VoxelCompound.Description, Double, List<Double>> getTunablePrecisionFitnessFunction(List<Locomotion.Metric> localMetrics) {
     return (VoxelCompound.Description vcd, Double p, Random random, Listener listener) -> {
       double dT = minDT;
       double finalT = maxFinalT;
@@ -74,25 +74,18 @@ public class LocomotionProblem implements TunablePrecisionProblem<VoxelCompound.
       } else {
         dT = minDT + p * (maxDT - minDT);
       }
-      Locomotion locomotion = new Locomotion(finalT, groundProfile, localMetrics);
-      locomotion.init(vcd);
-      while (!locomotion.isDone()) {
-        if (listener instanceof BridgeListener) {
-          Snapshot snapshot = locomotion.step(dT, true);
-          listener.listen(new BridgeListener.SnapshotEvent(snapshot));
-        } else {
-          locomotion.step(dT, false);
-        }
+      Settings settings = new Settings();
+      settings.setStepFrequency(dT);
+      Locomotion locomotion = new Locomotion(finalT, groundProfile, localMetrics, 2, null, settings);
+      List<Double> metricValues = locomotion.apply(vcd);
+      for (int i = 0; i<metricValues.size(); i++) {
+        metricValues.set(i, metricValues.get(i)*(localMetrics.get(i).isToMinimize()?1d:(-1d)));
       }
-      double[] metricValues = locomotion.getMetrics();
-      for (int i = 0; i<metricValues.length; i++) {
-        metricValues[i] = metricValues[i]*(locomotion.metrics()[i].isToMinimize()?1d:(-1d));
-      }
-      return Arrays.stream(metricValues).mapToObj((v) -> v).collect(Collectors.toList());
+      return metricValues;
     };
   }
   
-  public Function<VoxelCompound.Description, List<Double>> getFitnessFunction(Locomotion.Metric... localMetrics) {
+  public Function<VoxelCompound.Description, List<Double>> getFitnessFunction(List<Locomotion.Metric> localMetrics) {
     NonDeterministicBiFunction<VoxelCompound.Description, Double, List<Double>> f = getTunablePrecisionFitnessFunction(localMetrics);
     Random random = new Random(1);
     return (VoxelCompound.Description vcd, Listener listener) -> {

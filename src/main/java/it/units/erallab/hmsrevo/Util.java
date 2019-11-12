@@ -1,23 +1,3 @@
-package it.units.erallab.hmsrevo;
-
-import it.units.erallab.hmsrobots.controllers.CentralizedMLP;
-import it.units.erallab.hmsrobots.controllers.DistributedMLP;
-import it.units.erallab.hmsrobots.controllers.PhaseSin;
-import it.units.erallab.hmsrobots.objects.Voxel;
-import it.units.erallab.hmsrobots.objects.VoxelCompound;
-import it.units.erallab.hmsrobots.util.Grid;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
-import java.util.Base64;
-import java.util.EnumSet;
-import java.util.Random;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
-
 /*
  * Copyright (C) 2019 Eric Medvet <eric.medvet@gmail.com>
  *
@@ -34,6 +14,18 @@ import java.util.zip.GZIPOutputStream;
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+package it.units.erallab.hmsrevo;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
+import java.util.Base64;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
+
 /**
  *
  * @author Eric Medvet <eric.medvet@gmail.com>
@@ -53,7 +45,7 @@ public class Util {
     oos.close();
     return Base64.getEncoder().encodeToString(baos.toByteArray());
   }
-  
+
   public static <T> T deserialize(String s, boolean compress) throws IOException, ClassNotFoundException {
     ByteArrayInputStream bais = new ByteArrayInputStream(Base64.getDecoder().decode(s));
     ObjectInputStream ois;
@@ -62,9 +54,9 @@ public class Util {
     } else {
       ois = new ObjectInputStream(bais);
     }
-    return (T)ois.readObject();
+    return (T) ois.readObject();
   }
-  
+
   public static <T extends Serializable> String lazilySerialize(T t) {
     try {
       return serialize(t, true);

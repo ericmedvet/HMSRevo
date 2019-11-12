@@ -16,7 +16,7 @@
  */
 package it.units.erallab.hmsrevo;
 
-import it.units.erallab.hmsrobots.Snapshot;
+import it.units.erallab.hmsrobots.objects.immutable.Snapshot;
 import it.units.erallab.hmsrobots.viewers.SnapshotListener;
 import it.units.malelab.jgea.core.listener.Listener;
 import it.units.malelab.jgea.core.listener.event.Event;
