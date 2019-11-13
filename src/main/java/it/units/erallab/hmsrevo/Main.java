@@ -120,7 +120,7 @@ public class Main extends Worker {
               if (typeName.equals("phases")) {
                 factory = new DoubleSequenceFactory(-Math.PI, Math.PI, voxels);
                 mapper = getPhaseSinMapper(shape, drivingFrequency);
-              } else if (typeName.equals("phases")) {
+              } else if (typeName.equals("phasesDevo")) {
                 factory = new DoubleSequenceFactory(-Math.PI, Math.PI, voxels * 3);
                 mapper = getPhaseSinWithDevoMapper(shape, drivingFrequency, finalT);
               } else if (typeName.equals("centralizedMLP")) {
