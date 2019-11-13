@@ -17,19 +17,24 @@
 package it.units.erallab.hmsrevo;
 
 import com.google.common.collect.Lists;
+import it.units.erallab.hmsrobots.controllers.CentralizedMLP;
 import it.units.erallab.hmsrobots.controllers.Controller;
 import it.units.erallab.hmsrobots.controllers.PhaseSin;
+import it.units.erallab.hmsrobots.controllers.TimeFunction;
 import it.units.erallab.hmsrobots.objects.Voxel;
 import it.units.erallab.hmsrobots.objects.VoxelCompound;
 import it.units.erallab.hmsrobots.problems.Locomotion;
 import it.units.erallab.hmsrobots.util.Grid;
+import it.units.erallab.hmsrobots.util.SerializableFunction;
 import it.units.malelab.jgea.Worker;
+import it.units.malelab.jgea.core.Factory;
 import it.units.malelab.jgea.core.Sequence;
 import it.units.malelab.jgea.core.evolver.Evolver;
 import it.units.malelab.jgea.core.evolver.MutationOnly;
 import it.units.malelab.jgea.core.evolver.StandardEvolver;
 import it.units.malelab.jgea.core.evolver.stopcondition.ElapsedTime;
 import it.units.malelab.jgea.core.function.Function;
+import it.units.malelab.jgea.core.function.NonDeterministicFunction;
 import it.units.malelab.jgea.core.genotype.DoubleSequenceFactory;
 import it.units.malelab.jgea.core.listener.Listener;
 import it.units.malelab.jgea.core.listener.MultiFileListenerFactory;
@@ -81,8 +86,9 @@ public class Main extends Worker {
     //read parameters
     int[] runs = ri(a("runs", "0:10"));
     List<String> shapeNames = l(a("shapes", "worm,biped,tripod"));
-    List<String> terrainNames = l(a("terrains", "uneven5,flat"));
-    List<String> evolverNames = l(a("evolver", "standard"));
+    List<String> terrainNames = l(a("terrains", "flat,uneven"));
+    List<String> evolverNames = l(a("evolver", "mutationOnly,standard"));
+    List<String> typeNames = l(a("type", "phases,phasesDevo,centralizedMLP"));
     double finalT = d(a("finalT", "30"));
     double minDT = d(a("minDT", "0.01"));
     double maxDT = d(a("maxDT", "0.2"));
@@ -98,83 +104,106 @@ public class Main extends Worker {
       for (String shapeName : shapeNames) {
         for (String terrainName : terrainNames) {
           for (String evolverName : evolverNames) {
-            //build problem                
-            LocomotionProblem problem = new LocomotionProblem(
-                    finalT, minDT, maxDT,
-                    createTerrain(terrainName), metrics,
-                    LocomotionProblem.ApproximationMethod.FINAL_T
-            );
-            //prepare robot related things
-            Grid<Boolean> shape = namedShapes.get(shapeName);
-            int voxels = (int) shape.values().stream().filter((b) -> b).count();
-            //prepare evolver
-            Evolver<Sequence<Double>, VoxelCompound.Description, List<Double>> evolver = null;
-            if (evolverName.equals("mutationOnly")) {
-              evolver = new MutationOnly<>(
-                      nPop,
-                      new DoubleSequenceFactory(-Math.PI, Math.PI, voxels),
-                      new ParetoRanker<>(false),
-                      getPhaseSinMapper(shape, drivingFrequency),
-                      new GaussianMutation(0.25),
-                      Lists.newArrayList(new ElapsedTime(maxElapsed, TimeUnit.MINUTES)),
-                      0,
-                      false
+            for (String typeName : typeNames) {
+              //build problem                
+              LocomotionProblem problem = new LocomotionProblem(
+                      finalT, minDT, maxDT,
+                      createTerrain(terrainName), metrics,
+                      LocomotionProblem.ApproximationMethod.FINAL_T
               );
-            } else if (evolverName.equals("standard")) {
-              Map<GeneticOperator<Sequence<Double>>, Double> operators = new LinkedHashMap<>();
-              operators.put(new SegmentCrossover(), 0.8d);
-              operators.put(new GaussianMutation(0.25d), 0.2d);
-              evolver = new StandardEvolver<>(
-                      nPop,
-                      new DoubleSequenceFactory(-Math.PI, Math.PI, voxels),
-                      new ParetoRanker<>(false),
-                      getPhaseSinMapper(shape, drivingFrequency),
-                      operators,
-                      new Tournament<>(3),
-                      new Worst(),
-                      nPop,
-                      true,
-                      Lists.newArrayList(new ElapsedTime(maxElapsed, TimeUnit.MINUTES)),
-                      0,
-                      false
-              );
-            }
-            //prepare keys
-            Map<String, String> keys = new LinkedHashMap<>();
-            keys.put("evolver", evolverName);
-            keys.put("run", Integer.toString(run));
-            keys.put("n.pop", Integer.toString(nPop));
-            keys.put("driving.frequency", Double.toString(drivingFrequency));
-            keys.put("shape", shapeName);
-            keys.put("terrain", terrainName);
-            keys.put("metrics", metrics.stream().map((m) -> m.toString().toLowerCase().replace("_", ".")).collect(Collectors.joining("/")));
-            System.out.println(keys);
-            //run evolver
-            Random r = new Random(run);
-            try {
-              evolver.solve(problem, r, executorService, Listener.onExecutor(statsListenerFactory.build(
-                      new Static(keys),
-                      new Basic(),
-                      new Population(),
-                      new BestInfo<>(problem.getFitnessFunction(metrics), "%+5.1f"),
-                      FunctionOfBest.create(
-                              "valid",
-                              problem.getFitnessFunction(Lists.newArrayList(Locomotion.Metric.values())),
-                              Arrays.stream(Locomotion.Metric.values()).map((m) -> {
-                                return m.toString().toLowerCase().replace('_', '.');
-                              }).collect(Collectors.toList()),
-                              Collections.nCopies(Locomotion.Metric.values().length, "%+5.1f"),
-                              0
-                      )
-              ).then(serializedBestListenerFactory.build(
-                      new Static(keys),
-                      new Basic(),
-                      new FunctionOfBest<>("serialized", (VoxelCompound.Description vcd, Listener l) -> {
-                        return Util.lazilySerialize(vcd);
-                      }, 0, "%s")
-              )), executorService));
-            } catch (InterruptedException | ExecutionException ex) {
-              L.log(Level.SEVERE, String.format("Cannot solve problem: %s", ex), ex);
+              //prepare robot related things
+              Grid<Boolean> shape = namedShapes.get(shapeName);
+              //prepare factory and mapper
+              Factory<Sequence<Double>> factory = null;
+              NonDeterministicFunction<Sequence<Double>, VoxelCompound.Description> mapper = null;
+              int voxels = (int) shape.values().stream().filter((b) -> b).count();
+              if (typeName.equals("phases")) {
+                factory = new DoubleSequenceFactory(-Math.PI, Math.PI, voxels);
+                mapper = getPhaseSinMapper(shape, drivingFrequency);
+              } else if (typeName.equals("phases")) {
+                factory = new DoubleSequenceFactory(-Math.PI, Math.PI, voxels * 3);
+                mapper = getPhaseSinWithDevoMapper(shape, drivingFrequency, finalT);
+              } else if (typeName.equals("centralizedMLP")) {
+                List<Voxel.Sensor> sensors = Lists.newArrayList(Voxel.Sensor.AREA_RATIO, Voxel.Sensor.Y_ROT_VELOCITY);
+                int[] innerNeurons = new int[]{(int)Math.round(sensors.size() * voxels * 0.65d)};
+                int params = CentralizedMLP.countParams(
+                        shape,
+                        Grid.create(shape.getW(), shape.getH(), sensors),
+                        innerNeurons
+                );
+                factory = new DoubleSequenceFactory(-1d, 1d, params);
+                mapper = getCentralizedMLPMapper(shape, sensors, drivingFrequency, innerNeurons);
+              }
+              //prepare evolver
+              Evolver<Sequence<Double>, VoxelCompound.Description, List<Double>> evolver = null;
+              if (evolverName.equals("mutationOnly")) {
+                evolver = new MutationOnly<>(
+                        nPop,
+                        factory,
+                        new ParetoRanker<>(false),
+                        mapper,
+                        new GaussianMutation(0.25),
+                        Lists.newArrayList(new ElapsedTime(maxElapsed, TimeUnit.MINUTES)),
+                        0,
+                        false
+                );
+              } else if (evolverName.equals("standard")) {
+                Map<GeneticOperator<Sequence<Double>>, Double> operators = new LinkedHashMap<>();
+                operators.put(new SegmentCrossover(), 0.8d);
+                operators.put(new GaussianMutation(0.25d), 0.2d);
+                evolver = new StandardEvolver<>(
+                        nPop,
+                        factory,
+                        new ParetoRanker<>(false),
+                        mapper,
+                        operators,
+                        new Tournament<>(3),
+                        new Worst(),
+                        nPop,
+                        false,
+                        Lists.newArrayList(new ElapsedTime(maxElapsed, TimeUnit.MINUTES)),
+                        0,
+                        false
+                );
+              }
+              //prepare keys
+              Map<String, String> keys = new LinkedHashMap<>();
+              keys.put("evolver", evolverName);
+              keys.put("type", typeName);
+              keys.put("run", Integer.toString(run));
+              keys.put("n.pop", Integer.toString(nPop));
+              keys.put("driving.frequency", Double.toString(drivingFrequency));
+              keys.put("shape", shapeName);
+              keys.put("terrain", terrainName);
+              keys.put("metrics", metrics.stream().map((m) -> m.toString().toLowerCase().replace("_", ".")).collect(Collectors.joining("/")));
+              System.out.println(keys);
+              //run evolver
+              Random r = new Random(run);
+              try {
+                evolver.solve(problem, r, executorService, Listener.onExecutor(statsListenerFactory.build(
+                        new Static(keys),
+                        new Basic(),
+                        new Population(),
+                        new BestInfo<>(problem.getFitnessFunction(metrics), "%+5.1f"),
+                        FunctionOfBest.create(
+                                "valid",
+                                problem.getFitnessFunction(Lists.newArrayList(Locomotion.Metric.values())),
+                                Arrays.stream(Locomotion.Metric.values()).map((m) -> {
+                                  return m.toString().toLowerCase().replace('_', '.');
+                                }).collect(Collectors.toList()),
+                                Collections.nCopies(Locomotion.Metric.values().length, "%+5.1f"),
+                                0
+                        )
+                ).then(serializedBestListenerFactory.build(
+                        new Static(keys),
+                        new Basic(),
+                        new FunctionOfBest<>("serialized", (VoxelCompound.Description vcd, Listener l) -> {
+                          return Util.lazilySerialize(vcd);
+                        }, 0, "%s")
+                )), executorService));
+              } catch (InterruptedException | ExecutionException ex) {
+                L.log(Level.SEVERE, String.format("Cannot solve problem: %s", ex), ex);
+              }
             }
           }
         }
@@ -193,6 +222,49 @@ public class Main extends Worker {
         }
       }
       Controller controller = new PhaseSin(frequency, 1d, phases);
+      Voxel.Builder builder = Voxel.Builder.create()
+              .springScaffoldings(EnumSet.of(Voxel.SpringScaffolding.CENTRAL_CROSS, Voxel.SpringScaffolding.SIDE_EXTERNAL))
+              .ropeJointsFlag(false);
+      return new VoxelCompound.Description(shape, controller, Grid.create(shape.getW(), shape.getH(), builder));
+    };
+  }
+
+  private Function<Sequence<Double>, VoxelCompound.Description> getCentralizedMLPMapper(final Grid<Boolean> shape, final List<Voxel.Sensor> sensors, final double frequency, final int[] innerNeurons) {
+    return (Sequence<Double> values, Listener listener) -> {
+      double[] weights = new double[values.size()];
+      for (int i = 0; i < values.size(); i++) {
+        weights[i] = values.get(i);
+      }
+      Controller controller = new CentralizedMLP(
+              shape,
+              Grid.create(shape.getW(), shape.getH(), sensors),
+              innerNeurons,
+              null,
+              t -> Math.sin(2d * Math.PI * frequency * t)
+      );
+      Voxel.Builder builder = Voxel.Builder.create()
+              .springScaffoldings(EnumSet.of(Voxel.SpringScaffolding.CENTRAL_CROSS, Voxel.SpringScaffolding.SIDE_EXTERNAL))
+              .ropeJointsFlag(false);
+      return new VoxelCompound.Description(shape, controller, Grid.create(shape.getW(), shape.getH(), builder));
+    };
+  }
+
+  private Function<Sequence<Double>, VoxelCompound.Description> getPhaseSinWithDevoMapper(final Grid<Boolean> shape, final double frequency, final double devoInterval) {
+    return (Sequence<Double> values, Listener listener) -> {
+      int c = 0;
+      Grid<SerializableFunction<Double, Double>> functions = Grid.create(shape);
+      for (Grid.Entry<Boolean> entry : shape) {
+        if (entry.getValue()) {
+          double phase = values.get(c);
+          double initD = values.get(c + 1);
+          double finalD = values.get(c + 2);
+          functions.set(entry.getX(), entry.getY(),
+                  t -> Math.sin(2d * Math.PI * frequency * t + phase) + initD + (t / devoInterval) * (finalD - initD)
+          );
+          c = c + 3;
+        }
+      }
+      Controller controller = new TimeFunction(functions);
       Voxel.Builder builder = Voxel.Builder.create()
               .springScaffoldings(EnumSet.of(Voxel.SpringScaffolding.CENTRAL_CROSS, Voxel.SpringScaffolding.SIDE_EXTERNAL))
               .ropeJointsFlag(false);
