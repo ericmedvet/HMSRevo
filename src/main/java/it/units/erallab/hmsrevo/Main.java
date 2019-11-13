@@ -82,7 +82,7 @@ public class Main extends Worker {
     int[] runs = ri(a("runs", "0:10"));
     List<String> shapeNames = l(a("shapes", "worm,biped,tripod"));
     List<String> terrainNames = l(a("terrains", "uneven5,flat"));
-    List<String> evolverNames = l(a("evolver", "mutationOnly,standard"));
+    List<String> evolverNames = l(a("evolver", "standard"));
     double finalT = d(a("finalT", "30"));
     double minDT = d(a("minDT", "0.01"));
     double maxDT = d(a("maxDT", "0.2"));
@@ -133,7 +133,7 @@ public class Main extends Worker {
                       new Tournament<>(3),
                       new Worst(),
                       nPop,
-                      false,
+                      true,
                       Lists.newArrayList(new ElapsedTime(maxElapsed, TimeUnit.MINUTES)),
                       0,
                       false

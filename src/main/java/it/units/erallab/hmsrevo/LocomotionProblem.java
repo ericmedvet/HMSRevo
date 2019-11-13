@@ -23,10 +23,8 @@ import it.units.malelab.jgea.core.function.NonDeterministicBiFunction;
 import it.units.malelab.jgea.core.function.NonDeterministicFunction;
 import it.units.malelab.jgea.core.listener.Listener;
 import it.units.malelab.jgea.problem.surrogate.TunablePrecisionProblem;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
-import java.util.stream.Collectors;
 import org.dyn4j.dynamics.Settings;
 
 /**
@@ -76,7 +74,7 @@ public class LocomotionProblem implements TunablePrecisionProblem<VoxelCompound.
       }
       Settings settings = new Settings();
       settings.setStepFrequency(dT);
-      Locomotion locomotion = new Locomotion(finalT, groundProfile, localMetrics, 2, null, settings);
+      Locomotion locomotion = new Locomotion(finalT, groundProfile, localMetrics, 1, null, settings);
       List<Double> metricValues = locomotion.apply(vcd);
       for (int i = 0; i<metricValues.size(); i++) {
         metricValues.set(i, metricValues.get(i)*(localMetrics.get(i).isToMinimize()?1d:(-1d)));
