@@ -81,7 +81,7 @@ public class Main extends Worker {
     //read parameters
     int[] runs = ri(a("runs", "0:10"));
     List<String> shapeNames = l(a("shapes", "worm,biped,tripod"));
-    List<String> terrainNames = l(a("terrains", "flat,uneven"));
+    List<String> terrainNames = l(a("terrains", "uneven5,flat"));
     List<String> evolverNames = l(a("evolver", "mutationOnly,standard"));
     double finalT = d(a("finalT", "30"));
     double minDT = d(a("minDT", "0.01"));
