@@ -85,8 +85,8 @@ public class Main extends Worker {
     namedShapes.put("biped", createShape(new int[]{11, 4}, new int[]{2, 2, 9, 4}));
     namedShapes.put("tripod", createShape(new int[]{11, 4}, new int[]{2, 2, 5, 4}, new int[]{7, 2, 9, 4}));
     //read parameters
-    int[] runs = ri(a("runs", "0:10"));
-    List<String> shapeNames = l(a("shapes", "worm,biped,tripod"));
+    int[] runs = ri(a("run", "0:10"));
+    List<String> shapeNames = l(a("shape", "worm,biped,tripod"));
     List<String> terrainNames = l(a("terrain", "flat,uneven5"));
     List<String> evolverNames = l(a("evolver", "mutationOnly,standard"));
     List<String> typeNames = l(a("type", "phases,phasesDevo,centralizedMLP"));
@@ -204,9 +204,6 @@ public class Main extends Worker {
                 )), executorService));
               } catch (InterruptedException | ExecutionException ex) {
                 L.log(Level.SEVERE, String.format("Cannot solve problem: %s", ex), ex);
-                
-                ex.printStackTrace();
-                
               }
             }
           }
@@ -243,7 +240,7 @@ public class Main extends Worker {
               shape,
               Grid.create(shape.getW(), shape.getH(), sensors),
               innerNeurons,
-              null,
+              weights,
               t -> Math.sin(2d * Math.PI * frequency * t)
       );
       Voxel.Builder builder = Voxel.Builder.create()
@@ -276,8 +273,7 @@ public class Main extends Worker {
     };
   }
 
-  private Grid<Boolean> createShape(int[] enclosing, int[]  
-    ... holes) {
+  private Grid<Boolean> createShape(int[] enclosing, int[]... holes) {
     Grid<Boolean> shape = Grid.create(enclosing[0], enclosing[1], true);
     for (int[] hole : holes) {
       for (int x = hole[0]; x < hole[2]; x++) {
