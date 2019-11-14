@@ -33,6 +33,7 @@ import it.units.malelab.jgea.core.evolver.Evolver;
 import it.units.malelab.jgea.core.evolver.MutationOnly;
 import it.units.malelab.jgea.core.evolver.StandardEvolver;
 import it.units.malelab.jgea.core.evolver.stopcondition.ElapsedTime;
+import it.units.malelab.jgea.core.evolver.stopcondition.Iterations;
 import it.units.malelab.jgea.core.function.Function;
 import it.units.malelab.jgea.core.function.NonDeterministicFunction;
 import it.units.malelab.jgea.core.genotype.DoubleSequenceFactory;
@@ -86,7 +87,7 @@ public class Main extends Worker {
     //read parameters
     int[] runs = ri(a("runs", "0:10"));
     List<String> shapeNames = l(a("shapes", "worm,biped,tripod"));
-    List<String> terrainNames = l(a("terrains", "flat,uneven"));
+    List<String> terrainNames = l(a("terrain", "flat,uneven5"));
     List<String> evolverNames = l(a("evolver", "mutationOnly,standard"));
     List<String> typeNames = l(a("type", "phases,phasesDevo,centralizedMLP"));
     double finalT = d(a("finalT", "30"));
@@ -94,7 +95,7 @@ public class Main extends Worker {
     double maxDT = d(a("maxDT", "0.2"));
     double drivingFrequency = d(a("drivingF", "-1"));
     int nPop = i(a("npop", "100"));
-    double maxElapsed = d(a("maxElapsed", "30"));
+    int iterations = i(a("iterations", "200"));
     List<Locomotion.Metric> metrics = Lists.newArrayList(Locomotion.Metric.TRAVEL_X_VELOCITY);
     //prepare things
     MultiFileListenerFactory statsListenerFactory = new MultiFileListenerFactory(a("dir", "."), a("fileStats", null));
@@ -143,7 +144,7 @@ public class Main extends Worker {
                         new ParetoRanker<>(false),
                         mapper,
                         new GaussianMutation(0.25),
-                        Lists.newArrayList(new ElapsedTime(maxElapsed, TimeUnit.MINUTES)),
+                        Lists.newArrayList(new Iterations(iterations)),
                         0,
                         false
                 );
@@ -160,8 +161,8 @@ public class Main extends Worker {
                         new Tournament<>(3),
                         new Worst(),
                         nPop,
-                        false,
-                        Lists.newArrayList(new ElapsedTime(maxElapsed, TimeUnit.MINUTES)),
+                        true,
+                        Lists.newArrayList(new Iterations(iterations)),
                         0,
                         false
                 );
@@ -203,6 +204,9 @@ public class Main extends Worker {
                 )), executorService));
               } catch (InterruptedException | ExecutionException ex) {
                 L.log(Level.SEVERE, String.format("Cannot solve problem: %s", ex), ex);
+                
+                ex.printStackTrace();
+                
               }
             }
           }
