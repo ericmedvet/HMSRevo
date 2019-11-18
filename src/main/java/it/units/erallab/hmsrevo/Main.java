@@ -16,7 +16,9 @@
  */
 package it.units.erallab.hmsrevo;
 
+import com.google.common.collect.LinkedHashMultiset;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Multiset;
 import it.units.erallab.hmsrobots.controllers.CentralizedMLP;
 import it.units.erallab.hmsrobots.controllers.Controller;
 import it.units.erallab.hmsrobots.controllers.PhaseSin;
@@ -26,6 +28,7 @@ import it.units.erallab.hmsrobots.objects.VoxelCompound;
 import it.units.erallab.hmsrobots.problems.Locomotion;
 import it.units.erallab.hmsrobots.util.Grid;
 import it.units.erallab.hmsrobots.util.SerializableFunction;
+import it.units.erallab.hmsrobots.util.Util;
 import it.units.malelab.jgea.Worker;
 import it.units.malelab.jgea.core.Factory;
 import it.units.malelab.jgea.core.Sequence;
@@ -35,6 +38,7 @@ import it.units.malelab.jgea.core.evolver.StandardEvolver;
 import it.units.malelab.jgea.core.evolver.stopcondition.ElapsedTime;
 import it.units.malelab.jgea.core.evolver.stopcondition.Iterations;
 import it.units.malelab.jgea.core.function.Function;
+import it.units.malelab.jgea.core.function.FunctionException;
 import it.units.malelab.jgea.core.function.NonDeterministicFunction;
 import it.units.malelab.jgea.core.genotype.DoubleSequenceFactory;
 import it.units.malelab.jgea.core.listener.Listener;
@@ -50,7 +54,9 @@ import it.units.malelab.jgea.core.operator.SegmentCrossover;
 import it.units.malelab.jgea.core.ranker.ParetoRanker;
 import it.units.malelab.jgea.core.ranker.selector.Tournament;
 import it.units.malelab.jgea.core.ranker.selector.Worst;
+import it.units.malelab.jgea.core.util.Pair;
 import java.io.FileNotFoundException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -60,8 +66,10 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
+import org.apache.commons.math3.analysis.function.Gaussian;
 
 /**
  *
@@ -126,7 +134,7 @@ public class Main extends Worker {
                 mapper = getPhaseSinWithDevoMapper(shape, drivingFrequency, finalT);
               } else if (typeName.equals("centralizedMLP")) {
                 List<Voxel.Sensor> sensors = Lists.newArrayList(Voxel.Sensor.AREA_RATIO, Voxel.Sensor.Y_ROT_VELOCITY);
-                int[] innerNeurons = new int[]{(int)Math.round(sensors.size() * voxels * 0.65d)};
+                int[] innerNeurons = new int[]{(int) Math.round(sensors.size() * voxels * 0.65d)};
                 int params = CentralizedMLP.countParams(
                         shape,
                         Grid.create(shape.getW(), shape.getH(), sensors),
@@ -273,7 +281,95 @@ public class Main extends Worker {
     };
   }
 
-  private Grid<Boolean> createShape(int[] enclosing, int[]... holes) {
+  private Function<Sequence<Double>, VoxelCompound.Description> getGaussianMixtureShapeMapper(final int w, final int h, final double frequency, final int nGaussian, final double threshold) {
+    final Voxel.Builder hardBuilder = Voxel.Builder.create()
+            .springScaffoldings(EnumSet.of(Voxel.SpringScaffolding.CENTRAL_CROSS, Voxel.SpringScaffolding.SIDE_EXTERNAL))
+            .springF(40d)
+            .ropeJointsFlag(false);
+    final Voxel.Builder softBuilder = Voxel.Builder.create()
+            .springScaffoldings(EnumSet.of(Voxel.SpringScaffolding.CENTRAL_CROSS, Voxel.SpringScaffolding.SIDE_EXTERNAL))
+            .springF(10d)
+            .ropeJointsFlag(false);
+    final Voxel.Builder actuatedBuilder = Voxel.Builder.create()
+            .springScaffoldings(EnumSet.of(Voxel.SpringScaffolding.CENTRAL_CROSS, Voxel.SpringScaffolding.SIDE_EXTERNAL))
+            .ropeJointsFlag(false);
+    final List<Pair<Voxel.Builder, SerializableFunction<Double, Double>>> materials = Lists.newArrayList(
+            Pair.build(hardBuilder, t -> 0d),
+            Pair.build(softBuilder, t -> 0d),
+            Pair.build(actuatedBuilder, t -> Math.sin(2d * Math.PI * frequency * t)),
+            Pair.build(actuatedBuilder, t -> Math.sin(-2d * Math.PI * frequency * t))
+    );
+    return (Sequence<Double> values, Listener listener) -> {
+      //build grid of sum of gaussians for each material
+      List<Grid<Double>> gaussianGrids = new ArrayList<>(materials.size());
+      int c = 0;
+      for (int i = 0; i < materials.size(); i++) {
+        Grid<Double> gaussianGrid = Grid.create(w, h, 0d);
+        gaussianGrids.add(gaussianGrid);
+        for (int j = 0; j < nGaussian; j++) {
+          //extract parameter of the j-th gaussian for the i-th material
+          double muX = values.get(c + 0);
+          double muY = values.get(c + 1);
+          double sigma = values.get(c + 2);
+          double weight = values.get(c + 3);
+          c = c + 4;
+          //compute over grid
+          for (int x = 0; x < w; x++) {
+            for (int y = 0; y < h; y++) {
+              double d = d((double) x / (double) w, (double) y / (double) h, muX, muY);
+              double g = gaussian(d, sigma) * weight;
+              gaussianGrid.set(x, y, gaussianGrid.get(x, y) + g);
+            }
+          }
+        }
+      }
+      //build grid with material index
+      Grid<Integer> materialIndexGrid = Grid.create(w, h, null);
+      for (int x = 0; x < w; x++) {
+        for (int y = 0; y < h; y++) {
+          Integer index = null;
+          double max = Double.NEGATIVE_INFINITY;
+          for (int i = 0; i < gaussianGrids.size(); i++) {
+            double value = gaussianGrids.get(i).get(x, y);
+            if ((value > threshold) && (value > max)) {
+              index = i;
+              max = value;
+            }
+          }
+          materialIndexGrid.set(x, y, index);
+        }
+      }
+      //find largest connected and crop
+      materialIndexGrid = Util.gridLargestConnected(materialIndexGrid, i -> i!=null);
+      materialIndexGrid = Util.cropGrid(materialIndexGrid, i -> i!=null);
+      //build grids for description
+      Grid<Boolean> structure = Grid.create(materialIndexGrid);
+      Grid<Voxel.Builder> builderGrid = Grid.create(materialIndexGrid);
+      Grid<SerializableFunction<Double, Double>> functions = Grid.create(materialIndexGrid);
+      for (Grid.Entry<Integer> entry : materialIndexGrid) {
+        int x = entry.getX();
+        int y = entry.getY();
+        if (entry.getValue()!=null) {
+          structure.set(x, y, true);
+          builderGrid.set(x, y, materials.get(entry.getValue()).first());
+          functions.set(x, y, materials.get(entry.getValue()).second());
+        }
+      }
+      Controller controller = new TimeFunction(functions);
+      return new VoxelCompound.Description(structure, controller, builderGrid);
+    };
+  }
+
+  private static double d(double x1, double y1, double x2, double y2) {
+    return Math.sqrt(Math.pow(x1 - x2, 2d) + Math.pow(y1 - y2, 2d));
+  }
+
+  private static double gaussian(double x, double sigma) {
+    return 1d / sigma / Math.sqrt(2d * Math.PI) * Math.exp(-x * x / 2d / sigma / sigma);
+  }
+
+  private Grid<Boolean> createShape(int[] enclosing, int[]  
+    ... holes) {
     Grid<Boolean> shape = Grid.create(enclosing[0], enclosing[1], true);
     for (int[] hole : holes) {
       for (int x = hole[0]; x < hole[2]; x++) {
