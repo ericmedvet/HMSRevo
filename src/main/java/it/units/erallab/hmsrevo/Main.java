@@ -16,9 +16,7 @@
  */
 package it.units.erallab.hmsrevo;
 
-import com.google.common.collect.LinkedHashMultiset;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Multiset;
 import it.units.erallab.hmsrobots.controllers.CentralizedMLP;
 import it.units.erallab.hmsrobots.controllers.Controller;
 import it.units.erallab.hmsrobots.controllers.PhaseSin;
@@ -35,10 +33,8 @@ import it.units.malelab.jgea.core.Sequence;
 import it.units.malelab.jgea.core.evolver.Evolver;
 import it.units.malelab.jgea.core.evolver.MutationOnly;
 import it.units.malelab.jgea.core.evolver.StandardEvolver;
-import it.units.malelab.jgea.core.evolver.stopcondition.ElapsedTime;
 import it.units.malelab.jgea.core.evolver.stopcondition.Iterations;
 import it.units.malelab.jgea.core.function.Function;
-import it.units.malelab.jgea.core.function.FunctionException;
 import it.units.malelab.jgea.core.function.NonDeterministicFunction;
 import it.units.malelab.jgea.core.genotype.DoubleSequenceFactory;
 import it.units.malelab.jgea.core.listener.Listener;
@@ -65,11 +61,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
-import org.apache.commons.math3.analysis.function.Gaussian;
 
 /**
  *
@@ -340,8 +333,8 @@ public class Main extends Worker {
         }
       }
       //find largest connected and crop
-      materialIndexGrid = Util.gridLargestConnected(materialIndexGrid, i -> i!=null);
-      materialIndexGrid = Util.cropGrid(materialIndexGrid, i -> i!=null);
+      materialIndexGrid = Util.gridLargestConnected(materialIndexGrid, i -> i != null);
+      materialIndexGrid = Util.cropGrid(materialIndexGrid, i -> i != null);
       //build grids for description
       Grid<Boolean> structure = Grid.create(materialIndexGrid);
       Grid<Voxel.Builder> builderGrid = Grid.create(materialIndexGrid);
@@ -349,7 +342,7 @@ public class Main extends Worker {
       for (Grid.Entry<Integer> entry : materialIndexGrid) {
         int x = entry.getX();
         int y = entry.getY();
-        if (entry.getValue()!=null) {
+        if (entry.getValue() != null) {
           structure.set(x, y, true);
           builderGrid.set(x, y, materials.get(entry.getValue()).first());
           functions.set(x, y, materials.get(entry.getValue()).second());
