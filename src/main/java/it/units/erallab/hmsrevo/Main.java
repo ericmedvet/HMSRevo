@@ -64,6 +64,7 @@ import java.util.Random;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 import org.dyn4j.dynamics.Settings;
 
@@ -85,13 +86,13 @@ public class Main extends Worker {
   public void run() {
 
     ScheduledExecutorService executor = Executors.newScheduledThreadPool(3);
-    //OnlineViewer viewer = new OnlineViewer(executor);
-    //viewer.start();
+    OnlineViewer viewer = new OnlineViewer(executor);
+    viewer.start();
     int nG = 5;
     int nM = 4;
     int p = nG * nM * 4;
     Factory<Sequence<Double>> f = new DoubleSequenceFactory(0d, 1d, p);
-    Function<Sequence<Double>, VoxelCompound.Description> map = getGaussianMixtureShapeMapper(10, 10, -1, nG, 1d);
+    Function<Sequence<Double>, VoxelCompound.Description> map = getGaussianMixtureShapeMapper(5, 5, -1, nG, 1d);
     Sequence<Double> s = f.build(1, new Random(1)).get(0);
     VoxelCompound.Description v = map.apply(s);
     Locomotion loco = new Locomotion(
@@ -99,7 +100,7 @@ public class Main extends Worker {
             createTerrain("uneven5"),
             Lists.newArrayList(Locomotion.Metric.TRAVEL_X_VELOCITY),
             1,
-            null,
+            viewer,
             new Settings()
     );
     loco.apply(v);
@@ -236,9 +237,7 @@ public class Main extends Worker {
                         }, 0, "%s")
                 )), executorService));
               } catch (InterruptedException | ExecutionException ex) {
-                //L.log(System.Logger.Level.ERROR, String.format("Cannot solve problem: %s", ex), ex);
-                System.getLogger(getClass().getName()).log(System.Logger.Level.ERROR, String.format("Cannot solve problem: %s", ex), ex);
-                ex.printStackTrace();
+                L.log(Level.SEVERE, String.format("Cannot solve problem: %s", ex), ex);
               }
             }
           }
