@@ -14,7 +14,7 @@
         <dependency>
             <groupId>it.units.erallab</groupId>
             <artifactId>TwoDimHighlyModularSoftRobots</artifactId>
-            <version>0.5.0</version>
+            <version>0.6.0</version>
         </dependency>
     </dependencies>
     <properties>
@@ -31,7 +31,6 @@
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>2.3</version>
                 <executions>
-                    <!-- Run shade goal on package phase -->
                     <execution>
                         <phase>package</phase>
                         <goals>

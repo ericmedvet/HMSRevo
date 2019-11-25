@@ -84,29 +84,6 @@ public class Main extends Worker {
 
   @Override
   public void run() {
-
-    ScheduledExecutorService executor = Executors.newScheduledThreadPool(3);
-    OnlineViewer viewer = new OnlineViewer(executor);
-    viewer.start();
-    int nG = 5;
-    int nM = 4;
-    int p = nG * nM * 4;
-    Factory<Sequence<Double>> f = new DoubleSequenceFactory(0d, 1d, p);
-    Function<Sequence<Double>, VoxelCompound.Description> map = getGaussianMixtureShapeMapper(5, 5, -1, nG, 1d);
-    Sequence<Double> s = f.build(1, new Random(1)).get(0);
-    VoxelCompound.Description v = map.apply(s);
-    Locomotion loco = new Locomotion(
-            30d,
-            createTerrain("uneven5"),
-            Lists.newArrayList(Locomotion.Metric.TRAVEL_X_VELOCITY),
-            1,
-            viewer,
-            new Settings()
-    );
-    loco.apply(v);
-
-    System.exit(0);
-
     //prepare shapes
     Map<String, Grid<Boolean>> namedShapes = new LinkedHashMap<>();
     namedShapes.put("worm", createShape(new int[]{11, 4}));
@@ -114,7 +91,7 @@ public class Main extends Worker {
     namedShapes.put("tripod", createShape(new int[]{11, 4}, new int[]{2, 0, 5, 2}, new int[]{7, 0, 9, 2}));
     //read parameters
     int[] runs = ri(a("run", "0:10"));
-    List<String> shapeNames = l(a("shape", "worm,biped,tripod"));
+    List<String> shapeNames = l(a("shape", "worm,biped,tripod,box10x10"));
     List<String> terrainNames = l(a("terrain", "flat,uneven5"));
     List<String> evolverNames = l(a("evolver", "mutationOnly,standard"));
     List<String> typeNames = l(a("type", "phases,phasesDevo,centralizedMLP"));
@@ -145,14 +122,16 @@ public class Main extends Worker {
               //prepare factory and mapper
               Factory<Sequence<Double>> factory = null;
               NonDeterministicFunction<Sequence<Double>, VoxelCompound.Description> mapper = null;
-              int voxels = (int) shape.values().stream().filter((b) -> b).count();
-              if (typeName.equals("phases")) {
+              if (typeName.equals("phases") && (shape != null)) {
+                int voxels = (int) shape.values().stream().filter((b) -> b).count();
                 factory = new DoubleSequenceFactory(-Math.PI, Math.PI, voxels);
                 mapper = getPhaseSinMapper(shape, drivingFrequency);
-              } else if (typeName.equals("phasesDevo")) {
+              } else if (typeName.equals("phasesDevo") && (shape != null)) {
+                int voxels = (int) shape.values().stream().filter((b) -> b).count();
                 factory = new DoubleSequenceFactory(-Math.PI, Math.PI, voxels * 3);
                 mapper = getPhaseSinWithDevoMapper(shape, drivingFrequency, finalT);
-              } else if (typeName.equals("centralizedMLP")) {
+              } else if (typeName.equals("centralizedMLP") && (shape != null)) {
+                int voxels = (int) shape.values().stream().filter((b) -> b).count();
                 List<Voxel.Sensor> sensors = Lists.newArrayList(Voxel.Sensor.AREA_RATIO, Voxel.Sensor.Y_ROT_VELOCITY);
                 int[] innerNeurons = new int[]{(int) Math.round(sensors.size() * voxels * 0.65d)};
                 int params = CentralizedMLP.countParams(
@@ -162,12 +141,16 @@ public class Main extends Worker {
                 );
                 factory = new DoubleSequenceFactory(-1d, 1d, params);
                 mapper = getCentralizedMLPMapper(shape, sensors, drivingFrequency, innerNeurons);
-              } else if (typeName.equals("shapeMaterials")) {
+              } else if (typeName.equals("shapeMaterials") && shapeName.startsWith("box")) {
                 int nGaussians = 5;
                 int nMaterials = 4;
                 int params = nGaussians * nMaterials * 4;
                 factory = new DoubleSequenceFactory(0d, 1d, params);
-                mapper = getGaussianMixtureShapeMapper(10, 10, drivingFrequency, nGaussians, 1d);
+                mapper = getGaussianMixtureShapeMapper(
+                        Integer.parseInt(shapeName.replace("box", "").split("x")[0]),
+                        Integer.parseInt(shapeName.replace("box", "").split("x")[1]),
+                        drivingFrequency, nGaussians, 1d
+                );
               }
               //prepare evolver
               Evolver<Sequence<Double>, VoxelCompound.Description, List<Double>> evolver = null;
@@ -257,10 +240,8 @@ public class Main extends Worker {
         }
       }
       Controller controller = new PhaseSin(frequency, 1d, phases);
-      Voxel.Builder builder = Voxel.Builder.create()
-              .springScaffoldings(EnumSet.of(Voxel.SpringScaffolding.CENTRAL_CROSS, Voxel.SpringScaffolding.SIDE_EXTERNAL))
-              .ropeJointsFlag(false);
-      return new VoxelCompound.Description(shape, controller, Grid.create(shape.getW(), shape.getH(), builder));
+      Voxel.Builder builder = Voxel.Builder.create();
+      return new VoxelCompound.Description(Grid.create(shape, b -> b ? builder : null), controller);
     };
   }
 
@@ -277,10 +258,8 @@ public class Main extends Worker {
               weights,
               t -> Math.sin(2d * Math.PI * frequency * t)
       );
-      Voxel.Builder builder = Voxel.Builder.create()
-              .springScaffoldings(EnumSet.of(Voxel.SpringScaffolding.CENTRAL_CROSS, Voxel.SpringScaffolding.SIDE_EXTERNAL))
-              .ropeJointsFlag(false);
-      return new VoxelCompound.Description(shape, controller, Grid.create(shape.getW(), shape.getH(), builder));
+      Voxel.Builder builder = Voxel.Builder.create();
+      return new VoxelCompound.Description(Grid.create(shape, b -> b ? builder : null), controller);
     };
   }
 
@@ -300,10 +279,8 @@ public class Main extends Worker {
         }
       }
       Controller controller = new TimeFunction(functions);
-      Voxel.Builder builder = Voxel.Builder.create()
-              .springScaffoldings(EnumSet.of(Voxel.SpringScaffolding.CENTRAL_CROSS, Voxel.SpringScaffolding.SIDE_EXTERNAL))
-              .ropeJointsFlag(false);
-      return new VoxelCompound.Description(shape, controller, Grid.create(shape.getW(), shape.getH(), builder));
+      Voxel.Builder builder = Voxel.Builder.create();
+      return new VoxelCompound.Description(Grid.create(shape, b -> b ? builder : null), controller);
     };
   }
 
@@ -369,20 +346,18 @@ public class Main extends Worker {
       materialIndexGrid = Util.gridLargestConnected(materialIndexGrid, i -> i != null);
       materialIndexGrid = Util.cropGrid(materialIndexGrid, i -> i != null);
       //build grids for description
-      Grid<Boolean> structure = Grid.create(materialIndexGrid.getW(), materialIndexGrid.getH(), false);
       Grid<Voxel.Builder> builderGrid = Grid.create(materialIndexGrid);
       Grid<SerializableFunction<Double, Double>> functions = Grid.create(materialIndexGrid);
       for (Grid.Entry<Integer> entry : materialIndexGrid) {
         int x = entry.getX();
         int y = entry.getY();
         if (entry.getValue() != null) {
-          structure.set(x, y, true);
           builderGrid.set(x, y, materials.get(entry.getValue()).first());
           functions.set(x, y, materials.get(entry.getValue()).second());
         }
       }
       Controller controller = new TimeFunction(functions);
-      return new VoxelCompound.Description(structure, controller, builderGrid);
+      return new VoxelCompound.Description(builderGrid, controller);
     };
   }
 
