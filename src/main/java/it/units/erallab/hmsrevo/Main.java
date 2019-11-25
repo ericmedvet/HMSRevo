@@ -27,6 +27,7 @@ import it.units.erallab.hmsrobots.problems.Locomotion;
 import it.units.erallab.hmsrobots.util.Grid;
 import it.units.erallab.hmsrobots.util.SerializableFunction;
 import it.units.erallab.hmsrobots.util.Util;
+import it.units.erallab.hmsrobots.viewers.OnlineViewer;
 import it.units.malelab.jgea.Worker;
 import it.units.malelab.jgea.core.Factory;
 import it.units.malelab.jgea.core.Sequence;
@@ -61,8 +62,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
-import java.util.logging.Level;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
+import org.dyn4j.dynamics.Settings;
 
 /**
  *
@@ -80,11 +83,34 @@ public class Main extends Worker {
 
   @Override
   public void run() {
+
+    ScheduledExecutorService executor = Executors.newScheduledThreadPool(3);
+    //OnlineViewer viewer = new OnlineViewer(executor);
+    //viewer.start();
+    int nG = 5;
+    int nM = 4;
+    int p = nG * nM * 4;
+    Factory<Sequence<Double>> f = new DoubleSequenceFactory(0d, 1d, p);
+    Function<Sequence<Double>, VoxelCompound.Description> map = getGaussianMixtureShapeMapper(10, 10, -1, nG, 1d);
+    Sequence<Double> s = f.build(1, new Random(1)).get(0);
+    VoxelCompound.Description v = map.apply(s);
+    Locomotion loco = new Locomotion(
+            30d,
+            createTerrain("uneven5"),
+            Lists.newArrayList(Locomotion.Metric.TRAVEL_X_VELOCITY),
+            1,
+            null,
+            new Settings()
+    );
+    loco.apply(v);
+
+    System.exit(0);
+
     //prepare shapes
     Map<String, Grid<Boolean>> namedShapes = new LinkedHashMap<>();
     namedShapes.put("worm", createShape(new int[]{11, 4}));
-    namedShapes.put("biped", createShape(new int[]{11, 4}, new int[]{2, 2, 9, 4}));
-    namedShapes.put("tripod", createShape(new int[]{11, 4}, new int[]{2, 2, 5, 4}, new int[]{7, 2, 9, 4}));
+    namedShapes.put("biped", createShape(new int[]{11, 4}, new int[]{2, 0, 9, 2}));
+    namedShapes.put("tripod", createShape(new int[]{11, 4}, new int[]{2, 0, 5, 2}, new int[]{7, 0, 9, 2}));
     //read parameters
     int[] runs = ri(a("run", "0:10"));
     List<String> shapeNames = l(a("shape", "worm,biped,tripod"));
@@ -135,6 +161,12 @@ public class Main extends Worker {
                 );
                 factory = new DoubleSequenceFactory(-1d, 1d, params);
                 mapper = getCentralizedMLPMapper(shape, sensors, drivingFrequency, innerNeurons);
+              } else if (typeName.equals("shapeMaterials")) {
+                int nGaussians = 5;
+                int nMaterials = 4;
+                int params = nGaussians * nMaterials * 4;
+                factory = new DoubleSequenceFactory(0d, 1d, params);
+                mapper = getGaussianMixtureShapeMapper(10, 10, drivingFrequency, nGaussians, 1d);
               }
               //prepare evolver
               Evolver<Sequence<Double>, VoxelCompound.Description, List<Double>> evolver = null;
@@ -204,7 +236,9 @@ public class Main extends Worker {
                         }, 0, "%s")
                 )), executorService));
               } catch (InterruptedException | ExecutionException ex) {
-                L.log(Level.SEVERE, String.format("Cannot solve problem: %s", ex), ex);
+                //L.log(System.Logger.Level.ERROR, String.format("Cannot solve problem: %s", ex), ex);
+                System.getLogger(getClass().getName()).log(System.Logger.Level.ERROR, String.format("Cannot solve problem: %s", ex), ex);
+                ex.printStackTrace();
               }
             }
           }
@@ -303,7 +337,7 @@ public class Main extends Worker {
           //extract parameter of the j-th gaussian for the i-th material
           double muX = values.get(c + 0);
           double muY = values.get(c + 1);
-          double sigma = values.get(c + 2);
+          double sigma = Math.max(0d, values.get(c + 2));
           double weight = values.get(c + 3);
           c = c + 4;
           //compute over grid
@@ -317,7 +351,7 @@ public class Main extends Worker {
         }
       }
       //build grid with material index
-      Grid<Integer> materialIndexGrid = Grid.create(w, h, null);
+      Grid<Integer> materialIndexGrid = Grid.create(w, h);
       for (int x = 0; x < w; x++) {
         for (int y = 0; y < h; y++) {
           Integer index = null;
@@ -336,7 +370,7 @@ public class Main extends Worker {
       materialIndexGrid = Util.gridLargestConnected(materialIndexGrid, i -> i != null);
       materialIndexGrid = Util.cropGrid(materialIndexGrid, i -> i != null);
       //build grids for description
-      Grid<Boolean> structure = Grid.create(materialIndexGrid);
+      Grid<Boolean> structure = Grid.create(materialIndexGrid.getW(), materialIndexGrid.getH(), false);
       Grid<Voxel.Builder> builderGrid = Grid.create(materialIndexGrid);
       Grid<SerializableFunction<Double, Double>> functions = Grid.create(materialIndexGrid);
       for (Grid.Entry<Integer> entry : materialIndexGrid) {
