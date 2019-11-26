@@ -27,7 +27,6 @@ import it.units.erallab.hmsrobots.problems.Locomotion;
 import it.units.erallab.hmsrobots.util.Grid;
 import it.units.erallab.hmsrobots.util.SerializableFunction;
 import it.units.erallab.hmsrobots.util.Util;
-import it.units.erallab.hmsrobots.viewers.OnlineViewer;
 import it.units.malelab.jgea.Worker;
 import it.units.malelab.jgea.core.Factory;
 import it.units.malelab.jgea.core.Sequence;
@@ -62,11 +61,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
-import org.dyn4j.dynamics.Settings;
 
 /**
  *
