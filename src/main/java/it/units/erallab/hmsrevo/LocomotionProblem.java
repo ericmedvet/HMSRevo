@@ -74,7 +74,7 @@ public class LocomotionProblem implements TunablePrecisionProblem<VoxelCompound.
       }
       Settings settings = new Settings();
       settings.setStepFrequency(dT);
-      Locomotion locomotion = new Locomotion(finalT, groundProfile, localMetrics, 1, null, settings);
+      Locomotion locomotion = new Locomotion(finalT, groundProfile, localMetrics, 1, settings);
       List<Double> metricValues = locomotion.apply(vcd);
       for (int i = 0; i<metricValues.size(); i++) {
         metricValues.set(i, metricValues.get(i)*(localMetrics.get(i).isToMinimize()?1d:(-1d)));

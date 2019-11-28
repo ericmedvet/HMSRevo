@@ -97,7 +97,7 @@ public class Main extends Worker {
     double drivingFrequency = d(a("drivingF", "-1"));
     int nPop = i(a("npop", "100"));
     int iterations = i(a("iterations", "200"));
-    List<Locomotion.Metric> metrics = Lists.newArrayList(Locomotion.Metric.TRAVEL_X_VELOCITY);
+    List<Locomotion.Metric> metrics = Lists.newArrayList(Locomotion.Metric.TRAVEL_X_RELATIVE_VELOCITY);
     //prepare things
     MultiFileListenerFactory statsListenerFactory = new MultiFileListenerFactory(a("dir", "."), a("fileStats", null));
     MultiFileListenerFactory serializedBestListenerFactory = new MultiFileListenerFactory(a("dir", "."), a("fileSerialized", null));
@@ -156,7 +156,7 @@ public class Main extends Worker {
                         factory,
                         new ParetoRanker<>(false),
                         mapper,
-                        new GaussianMutation(0.25),
+                        new GaussianMutation(0.3),
                         Lists.newArrayList(new Iterations(iterations)),
                         0,
                         false
@@ -164,7 +164,7 @@ public class Main extends Worker {
               } else if (evolverName.equals("standard")) {
                 Map<GeneticOperator<Sequence<Double>>, Double> operators = new LinkedHashMap<>();
                 operators.put(new SegmentCrossover(), 0.8d);
-                operators.put(new GaussianMutation(0.25d), 0.2d);
+                operators.put(new GaussianMutation(0.3d), 0.2d);
                 evolver = new StandardEvolver<>(
                         nPop,
                         factory,
