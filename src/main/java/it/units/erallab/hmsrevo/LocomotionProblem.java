@@ -41,14 +41,16 @@ public class LocomotionProblem implements TunablePrecisionProblem<VoxelCompound.
   private final double minDT;
   private final double maxDT;
   private final double[][] groundProfile;
+  private final int controlStepInterval;
   private final List<Locomotion.Metric> metrics;
   private final ApproximationMethod approximationMethod;
 
-  public LocomotionProblem(double maxFinalT, double minDT, double maxDT, double[][] groundProfile, List<Locomotion.Metric> metrics, ApproximationMethod approximationMethod) {
+  public LocomotionProblem(double maxFinalT, double minDT, double maxDT, double[][] groundProfile, int controlStepInterval, List<Locomotion.Metric> metrics, ApproximationMethod approximationMethod) {
     this.maxFinalT = maxFinalT;
     this.minDT = minDT;
     this.maxDT = maxDT;
     this.groundProfile = groundProfile;
+    this.controlStepInterval = controlStepInterval;
     this.metrics = metrics;
     this.approximationMethod = approximationMethod;
   }
@@ -74,7 +76,7 @@ public class LocomotionProblem implements TunablePrecisionProblem<VoxelCompound.
       }
       Settings settings = new Settings();
       settings.setStepFrequency(dT);
-      Locomotion locomotion = new Locomotion(finalT, groundProfile, localMetrics, 1, settings);
+      Locomotion locomotion = new Locomotion(finalT, groundProfile, localMetrics, controlStepInterval, settings);
       List<Double> metricValues = locomotion.apply(vcd);
       for (int i = 0; i<metricValues.size(); i++) {
         metricValues.set(i, metricValues.get(i)*(localMetrics.get(i).isToMinimize()?1d:(-1d)));
