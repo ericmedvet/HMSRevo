@@ -24,6 +24,7 @@ import it.units.erallab.hmsrobots.util.Grid;
 import it.units.erallab.hmsrobots.util.Util;
 import it.units.erallab.hmsrobots.viewers.GraphicsDrawer;
 import it.units.erallab.hmsrobots.viewers.VideoGridWriter;
+import it.units.malelab.jgea.Worker;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
@@ -38,6 +39,8 @@ import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang3.tuple.Pair;
 import org.dyn4j.dynamics.Settings;
+
+import static it.units.malelab.jgea.core.util.Args.*;
 
 /**
  *
