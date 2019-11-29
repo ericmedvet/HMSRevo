@@ -64,6 +64,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 
+import static it.units.malelab.jgea.core.util.Args.*;
+
 /**
  *
  * @author Eric Medvet <eric.medvet@gmail.com>
@@ -325,7 +327,7 @@ public class Main extends Worker {
           //compute over grid
           for (int x = 0; x < w; x++) {
             for (int y = 0; y < h; y++) {
-              double d = d((double) x / (double) w, (double) y / (double) h, muX, muY);
+              double d = dist((double) x / (double) w, (double) y / (double) h, muX, muY);
               double g = gaussian(d, sigma) * weight;
               gaussianGrid.set(x, y, gaussianGrid.get(x, y) + g);
             }
@@ -367,7 +369,7 @@ public class Main extends Worker {
     };
   }
 
-  private static double d(double x1, double y1, double x2, double y2) {
+  private static double dist(double x1, double y1, double x2, double y2) {
     return Math.sqrt(Math.pow(x1 - x2, 2d) + Math.pow(y1 - y2, 2d));
   }
 

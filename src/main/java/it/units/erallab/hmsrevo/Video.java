@@ -24,7 +24,6 @@ import it.units.erallab.hmsrobots.util.Grid;
 import it.units.erallab.hmsrobots.util.Util;
 import it.units.erallab.hmsrobots.viewers.GraphicsDrawer;
 import it.units.erallab.hmsrobots.viewers.VideoGridWriter;
-import it.units.malelab.jgea.core.util.Args;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
@@ -54,6 +53,11 @@ public class Video {
   public static void main(String[] args) throws IOException, ClassNotFoundException {
     //read params
     String serializedColumnName = a(args, "serializedColumnName", "serialized");
+    String inputFile = a(args, "inputFile", "input.txt");
+    String outputFile = a(args, "outputFile", "output.mp4");
+    int w = i(a(args, "w", "800"));
+    int h = i(a(args, "h", "600"));
+    int frameRate = i(a(args, "frameRate", "25"));
     //prepare grid
     Grid<Map<String, String>> filterGrid = Grid.create(3, 3);
     filterGrid.set(0, 0, filter("iterations=1;evolver=standard;type=phases;mutation.sigma=0.15"));
@@ -73,9 +77,9 @@ public class Video {
             new Settings()
     );
     fromCSV(
-            "/home/eric/experiments/2dhmsr/hpc/serialized.4.2876077.aa034532.txt",
-            "/home/eric/experiments/2dhmsr/biped.sigmas.7.mp4",
-            600, 600, 20,
+            inputFile,
+            outputFile,
+            w, h, frameRate,
             serializedColumnName,
             filterGrid,
             s -> Util.<VoxelCompound.Description>lazilyDeserialize(s),
