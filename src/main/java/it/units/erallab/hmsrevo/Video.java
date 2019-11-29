@@ -49,15 +49,16 @@ public class Video {
   
   public static void main(String[] args) throws IOException, ClassNotFoundException {
     String serializedColumnName = "serialized";
-    Grid<Map<String, String>> filterGrid = Grid.create(2, 3);
-    filterGrid.set(0, 0, filter("iterations=1;evolver=standard"));
-    filterGrid.set(0, 1, filter("iterations=50;evolver=standard"));
-    filterGrid.set(0, 2, filter("iterations=100;evolver=standard"));
-    //filterGrid.set(0, 3, filter("iterations=150;evolver=standard"));
-    filterGrid.set(1, 0, filter("iterations=1;evolver=mutationOnly"));
-    filterGrid.set(1, 1, filter("iterations=50;evolver=mutationOnly"));
-    filterGrid.set(1, 2, filter("iterations=100;evolver=mutationOnly"));
-    //filterGrid.set(1, 3, filter("iterations=150;evolver=mutationOnly"));
+    Grid<Map<String, String>> filterGrid = Grid.create(3, 3);
+    filterGrid.set(0, 0, filter("iterations=1;evolver=standard;type=phases;mutation.sigma=0.15"));
+    filterGrid.set(0, 1, filter("iterations=50;evolver=standard;type=phases;mutation.sigma=0.15"));
+    filterGrid.set(0, 2, filter("iterations=100;evolver=standard;type=phases;mutation.sigma=0.15"));
+    filterGrid.set(1, 0, filter("iterations=1;evolver=standard;type=phases;mutation.sigma=0.25"));
+    filterGrid.set(1, 1, filter("iterations=50;evolver=standard;type=phases;mutation.sigma=0.25"));
+    filterGrid.set(1, 2, filter("iterations=100;evolver=standard;type=phases;mutation.sigma=0.25"));
+    filterGrid.set(2, 0, filter("iterations=1;evolver=standard;type=phases;mutation.sigma=0.35"));
+    filterGrid.set(2, 1, filter("iterations=50;evolver=standard;type=phases;mutation.sigma=0.35"));
+    filterGrid.set(2, 2, filter("iterations=100;evolver=standard;type=phases;mutation.sigma=0.35"));
     Locomotion locomotion = new Locomotion(
             30,
             Main.createTerrain("flat"),
@@ -66,9 +67,9 @@ public class Video {
             new Settings()
     );
     fromCSV(
-            "/home/eric/experiments/2dhmsr/hpc/serialized.7.2874711.b16f5132.txt",
-            "/home/eric/experiments/2dhmsr/shape-materials.2evolvers.7.mp4",
-            900, 900, 25,
+            "/home/eric/experiments/2dhmsr/hpc/serialized.4.2876077.aa034532.txt",
+            "/home/eric/experiments/2dhmsr/biped.sigmas.7.mp4",
+            600, 600, 20,
             serializedColumnName,
             filterGrid,
             s -> Util.<VoxelCompound.Description>lazilyDeserialize(s),
