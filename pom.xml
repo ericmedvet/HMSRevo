@@ -33,7 +33,7 @@
         <dependency>
             <groupId>it.units.erallab</groupId>
             <artifactId>TwoDimHighlyModularSoftRobots</artifactId>
-            <version>0.6.0</version>
+            <version>0.7.0</version>
         </dependency>
         <dependency>
             <groupId>it.units.malelab</groupId>

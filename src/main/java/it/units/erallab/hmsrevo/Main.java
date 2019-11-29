@@ -64,8 +64,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 
-import static it.units.malelab.jgea.core.util.Args.*;
-
 /**
  *
  * @author Eric Medvet <eric.medvet@gmail.com>

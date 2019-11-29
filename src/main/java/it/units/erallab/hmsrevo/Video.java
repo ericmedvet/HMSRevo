@@ -24,7 +24,7 @@ import it.units.erallab.hmsrobots.util.Grid;
 import it.units.erallab.hmsrobots.util.Util;
 import it.units.erallab.hmsrobots.viewers.GraphicsDrawer;
 import it.units.erallab.hmsrobots.viewers.VideoGridWriter;
-import it.units.malelab.jgea.Worker;
+import it.units.malelab.jgea.core.util.Args;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
@@ -42,6 +42,7 @@ import org.dyn4j.dynamics.Settings;
 
 import static it.units.malelab.jgea.core.util.Args.*;
 
+
 /**
  *
  * @author Eric Medvet <eric.medvet@gmail.com>
@@ -51,7 +52,9 @@ public class Video {
   private static final Logger L = Logger.getLogger(Video.class.getName());
   
   public static void main(String[] args) throws IOException, ClassNotFoundException {
-    String serializedColumnName = "serialized";
+    //read params
+    String serializedColumnName = a(args, "serializedColumnName", "serialized");
+    //prepare grid
     Grid<Map<String, String>> filterGrid = Grid.create(3, 3);
     filterGrid.set(0, 0, filter("iterations=1;evolver=standard;type=phases;mutation.sigma=0.15"));
     filterGrid.set(0, 1, filter("iterations=50;evolver=standard;type=phases;mutation.sigma=0.15"));
