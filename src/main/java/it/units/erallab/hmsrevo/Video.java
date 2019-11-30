@@ -41,7 +41,6 @@ import org.dyn4j.dynamics.Settings;
 
 import static it.units.malelab.jgea.core.util.Args.*;
 
-
 /**
  *
  * @author Eric Medvet <eric.medvet@gmail.com>
@@ -49,31 +48,42 @@ import static it.units.malelab.jgea.core.util.Args.*;
 public class Video {
 
   private static final Logger L = Logger.getLogger(Video.class.getName());
-  
+
   public static void main(String[] args) throws IOException, ClassNotFoundException {
-    //read params
+    //read main params
     String serializedColumnName = a(args, "serializedColumnName", "serialized");
     String inputFile = a(args, "inputFile", "input.txt");
     String outputFile = a(args, "outputFile", "output.mp4");
+    String terrain = a(args, "terrain", "flat");
     int w = i(a(args, "w", "800"));
     int h = i(a(args, "h", "600"));
     int frameRate = i(a(args, "frameRate", "25"));
-    //prepare grid
-    Grid<Map<String, String>> filterGrid = Grid.create(3, 3);
-    filterGrid.set(0, 0, filter("iterations=1;evolver=standard;type=phases;mutation.sigma=0.15"));
-    filterGrid.set(0, 1, filter("iterations=50;evolver=standard;type=phases;mutation.sigma=0.15"));
-    filterGrid.set(0, 2, filter("iterations=100;evolver=standard;type=phases;mutation.sigma=0.15"));
-    filterGrid.set(1, 0, filter("iterations=1;evolver=standard;type=phases;mutation.sigma=0.25"));
-    filterGrid.set(1, 1, filter("iterations=50;evolver=standard;type=phases;mutation.sigma=0.25"));
-    filterGrid.set(1, 2, filter("iterations=100;evolver=standard;type=phases;mutation.sigma=0.25"));
-    filterGrid.set(2, 0, filter("iterations=1;evolver=standard;type=phases;mutation.sigma=0.35"));
-    filterGrid.set(2, 1, filter("iterations=50;evolver=standard;type=phases;mutation.sigma=0.35"));
-    filterGrid.set(2, 2, filter("iterations=100;evolver=standard;type=phases;mutation.sigma=0.35"));
+    int controlStepInterval = i(a(args, "controlStepInterval", "1"));
+    double finalT = d(a(args, "finalT", "30"));
+    //read grid params
+    //TODO: fix, doesn't work without filters
+    String commonFilter = a(args, "commonFilter", "");
+    String xFilters = a(args, "xFilter", "");
+    String yFilters = a(args, "yFilter", "");
+    String[] xFilterValues = xFilters.split(":")[1].split(",");
+    String[] yFilterValues = yFilters.split(":")[1].split(",");
+    String xFilterKey = xFilters.split(":")[0];
+    String yFilterKey = yFilters.split(":")[0];
+    Grid<Map<String, String>> filterGrid = Grid.create(xFilterValues.length, yFilterValues.length);
+    for (int x = 0; x < xFilterValues.length; x++) {
+      for (int y = 0; y < yFilterValues.length; y++) {
+        String filter = commonFilter;
+        filter = filter + ";" + xFilterKey + ":" + xFilterValues[x];
+        filter = filter + ";" + yFilterKey + ":" + yFilterValues[y];
+        filterGrid.set(x, y, filter(filter));
+      }
+    }
+    //prepare problem
     Locomotion locomotion = new Locomotion(
-            30,
-            Main.createTerrain("flat"),
+            finalT,
+            Main.createTerrain(terrain),
             Lists.newArrayList(Locomotion.Metric.TRAVEL_X_VELOCITY),
-            1,
+            controlStepInterval,
             new Settings()
     );
     fromCSV(
@@ -86,8 +96,8 @@ public class Video {
             locomotion
     );
   }
-  
-    private static <S> void fromCSV(String inputFile, String outputFile, int w, int h, int frameRate, String serializedColumnName, Grid<Map<String, String>> filterGrid, Function<String, S> deserializer, Episode<S, ?> episode) throws IOException {
+
+  private static <S> void fromCSV(String inputFile, String outputFile, int w, int h, int frameRate, String serializedColumnName, Grid<Map<String, String>> filterGrid, Function<String, S> deserializer, Episode<S, ?> episode) throws IOException {
     //read data
     Grid<Pair<String, S>> namedSolutionGrid = Grid.create(filterGrid);
     Reader in = new FileReader(inputFile);
@@ -130,7 +140,7 @@ public class Video {
     Map<String, String> map = new HashMap<>();
     for (String pair : string.split(";")) {
       if (!pair.trim().isEmpty()) {
-        String[] pieces = pair.trim().split("=");
+        String[] pieces = pair.trim().split(":");
         if (pieces.length > 1) {
           map.put(pieces[0].trim(), pieces[1].trim());
         }
