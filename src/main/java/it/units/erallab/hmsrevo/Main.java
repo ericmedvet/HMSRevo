@@ -92,12 +92,12 @@ public class Main extends Worker {
     List<String> shapeNames = l(a("shape", "worm,biped,tripod,box10x10"));
     List<String> terrainNames = l(a("terrain", "flat,uneven5"));
     List<String> evolverNames = l(a("evolver", "mutationOnly,standard"));
-    List<String> typeNames = l(a("type", "phases,phasesDevo,centralizedMLP"));
-    double finalT = d(a("finalT", "30"));
-    double minDT = d(a("minDT", "0.01"));
+    List<String> typeNames = l(a("type", "phases,centralizedMLP"));
+    double finalT = d(a("finalT", "60"));
+    double minDT = d(a("minDT", "0.015"));
     double maxDT = d(a("maxDT", "0.2"));
     double drivingFrequency = d(a("drivingF", "-1"));
-    List<Double> mutationSigmas = d(l(a("mutationSigma", "0.25")));
+    List<Double> mutationSigmas = d(l(a("mutationSigma", "0.15")));
     List<Integer> controlStepIntervals = i(l(a("controlStepInterval", "1")));
     int nPop = i(a("npop", "100"));
     int iterations = i(a("iterations", "200"));
@@ -136,7 +136,7 @@ public class Main extends Worker {
                     mapper = getPhaseSinWithDevoMapper(shape, drivingFrequency, finalT);
                   } else if (typeName.equals("centralizedMLP") && (shape != null)) {
                     int voxels = (int) shape.values().stream().filter((b) -> b).count();
-                    List<Voxel.Sensor> sensors = Lists.newArrayList(Voxel.Sensor.AREA_RATIO, Voxel.Sensor.Y_ROT_VELOCITY);
+                    List<Voxel.Sensor> sensors = Lists.newArrayList(Voxel.Sensor.AREA_RATIO, Voxel.Sensor.Y_ROT_VELOCITY, Voxel.Sensor.X_ROT_VELOCITY);
                     int[] innerNeurons = new int[]{(int) Math.round(sensors.size() * voxels * 0.65d)};
                     int params = CentralizedMLP.countParams(
                             shape,
@@ -200,7 +200,7 @@ public class Main extends Worker {
                   keys.put("shape", shapeName);
                   keys.put("terrain", terrainName);
                   keys.put("metrics", metrics.stream().map((m) -> m.toString().toLowerCase().replace("_", ".")).collect(Collectors.joining("/")));
-                  System.out.println(keys);
+                  L.info(String.format("Keys: %s", keys));
                   //run evolver
                   Random r = new Random(run);
                   try {

@@ -72,7 +72,7 @@ public class Video {
     Grid<Map<String, String>> filterGrid = Grid.create(xFilterValues.length, yFilterValues.length);
     for (int x = 0; x < xFilterValues.length; x++) {
       for (int y = 0; y < yFilterValues.length; y++) {
-        String filter = commonFilter;
+        String filter = commonFilter.replace("#", ";");
         filter = filter + ";" + xFilterKey + ":" + xFilterValues[x];
         filter = filter + ";" + yFilterKey + ":" + yFilterValues[y];
         filterGrid.set(x, y, filter(filter));
@@ -124,6 +124,15 @@ public class Video {
         }
       }
     }
+    for (Grid.Entry<Pair<String, S>> entry : namedSolutionGrid) {
+      if (entry.getValue()==null) {
+        throw new IllegalArgumentException(String.format(
+                "Cell in position (%d,%d) is null because of filter %s",
+                entry.getX(), entry.getY(),
+                filterGrid.get(entry.getX(), entry.getY())
+        ));
+      }
+    }
     ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
     VideoGridWriter<S> writer = new VideoGridWriter<>(
             namedSolutionGrid, episode,
@@ -134,6 +143,7 @@ public class Video {
     );
     writer.run();
     executorService.shutdown();
+    executorService.shutdownNow();
   }
 
   private static Map<String, String> filter(String string) {
