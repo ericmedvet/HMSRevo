@@ -136,7 +136,12 @@ public class Main extends Worker {
                     mapper = getPhaseSinWithDevoMapper(shape, drivingFrequency, finalT);
                   } else if (typeName.equals("centralizedMLP") && (shape != null)) {
                     int voxels = (int) shape.values().stream().filter((b) -> b).count();
-                    List<Voxel.Sensor> sensors = Lists.newArrayList(Voxel.Sensor.AREA_RATIO, Voxel.Sensor.Y_ROT_VELOCITY, Voxel.Sensor.X_ROT_VELOCITY);
+                    List<Voxel.Sensor> sensors = Lists.newArrayList(
+                            Voxel.Sensor.AREA_RATIO,
+                            Voxel.Sensor.Y_ROT_VELOCITY,
+                            Voxel.Sensor.X_ROT_VELOCITY,
+                            Voxel.Sensor.TOUCHING
+                    );
                     int[] innerNeurons = new int[]{(int) Math.round(sensors.size() * voxels * 0.65d)};
                     int params = CentralizedMLP.countParams(
                             shape,
