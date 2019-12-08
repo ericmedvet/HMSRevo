@@ -105,6 +105,17 @@ public class Main extends Worker {
     //prepare things
     MultiFileListenerFactory statsListenerFactory = new MultiFileListenerFactory(a("dir", "."), a("fileStats", null));
     MultiFileListenerFactory serializedBestListenerFactory = new MultiFileListenerFactory(a("dir", "."), a("fileSerialized", null));
+    Voxel.Builder builder = Voxel.Builder.create()
+            .springF(15d)
+            .massLinearDamping(0.5d)
+            .massAngularDamping(0.5d)
+            .areaRatioOffset(0.2d)
+            .massSideLengthRatio(0.2d)
+            .ropeJointsFlag(false)
+            .springScaffoldings(EnumSet.of(
+                    Voxel.SpringScaffolding.SIDE_EXTERNAL,
+                    Voxel.SpringScaffolding.CENTRAL_CROSS
+            ));
     //iterate   
     for (int run : runs) {
       for (String shapeName : shapeNames) {
@@ -129,15 +140,14 @@ public class Main extends Worker {
                   if (typeName.equals("phases") && (shape != null)) {
                     int voxels = (int) shape.values().stream().filter((b) -> b).count();
                     factory = new DoubleSequenceFactory(-Math.PI, Math.PI, voxels);
-                    mapper = getPhaseSinMapper(shape, drivingFrequency);
+                    mapper = getPhaseSinMapper(shape, builder, drivingFrequency);
                   } else if (typeName.equals("phasesDevo") && (shape != null)) {
                     int voxels = (int) shape.values().stream().filter((b) -> b).count();
                     factory = new DoubleSequenceFactory(-Math.PI, Math.PI, voxels * 3);
-                    mapper = getPhaseSinWithDevoMapper(shape, drivingFrequency, finalT);
+                    mapper = getPhaseSinWithDevoMapper(shape, builder, drivingFrequency, finalT);
                   } else if (typeName.equals("centralizedMLP") && (shape != null)) {
                     int voxels = (int) shape.values().stream().filter((b) -> b).count();
                     List<Voxel.Sensor> sensors = Lists.newArrayList(
-                            Voxel.Sensor.AREA_RATIO,
                             Voxel.Sensor.Y_ROT_VELOCITY,
                             Voxel.Sensor.X_ROT_VELOCITY,
                             Voxel.Sensor.TOUCHING
@@ -149,7 +159,7 @@ public class Main extends Worker {
                             innerNeurons
                     );
                     factory = new DoubleSequenceFactory(-1d, 1d, params);
-                    mapper = getCentralizedMLPMapper(shape, sensors, drivingFrequency, innerNeurons);
+                    mapper = getCentralizedMLPMapper(shape, builder, sensors, drivingFrequency, innerNeurons);
                   } else if (typeName.equals("shapeMaterials") && shapeName.startsWith("box")) {
                     int nGaussians = 5;
                     int nMaterials = 4;
@@ -242,7 +252,7 @@ public class Main extends Worker {
     }
   }
 
-  private Function<Sequence<Double>, VoxelCompound.Description> getPhaseSinMapper(final Grid<Boolean> shape, final double frequency) {
+  private Function<Sequence<Double>, VoxelCompound.Description> getPhaseSinMapper(final Grid<Boolean> shape, Voxel.Builder builder, final double frequency) {
     return (Sequence<Double> values, Listener listener) -> {
       int c = 0;
       Grid<Double> phases = Grid.create(shape);
@@ -253,12 +263,11 @@ public class Main extends Worker {
         }
       }
       Controller controller = new PhaseSin(frequency, 1d, phases);
-      Voxel.Builder builder = Voxel.Builder.create();
       return new VoxelCompound.Description(Grid.create(shape, b -> b ? builder : null), controller);
     };
   }
 
-  private Function<Sequence<Double>, VoxelCompound.Description> getCentralizedMLPMapper(final Grid<Boolean> shape, final List<Voxel.Sensor> sensors, final double frequency, final int[] innerNeurons) {
+  private Function<Sequence<Double>, VoxelCompound.Description> getCentralizedMLPMapper(final Grid<Boolean> shape, Voxel.Builder builder, final List<Voxel.Sensor> sensors, final double frequency, final int[] innerNeurons) {
     return (Sequence<Double> values, Listener listener) -> {
       double[] weights = new double[values.size()];
       for (int i = 0; i < values.size(); i++) {
@@ -271,12 +280,11 @@ public class Main extends Worker {
               weights,
               t -> Math.sin(2d * Math.PI * frequency * t)
       );
-      Voxel.Builder builder = Voxel.Builder.create();
       return new VoxelCompound.Description(Grid.create(shape, b -> b ? builder : null), controller);
     };
   }
 
-  private Function<Sequence<Double>, VoxelCompound.Description> getPhaseSinWithDevoMapper(final Grid<Boolean> shape, final double frequency, final double devoInterval) {
+  private Function<Sequence<Double>, VoxelCompound.Description> getPhaseSinWithDevoMapper(final Grid<Boolean> shape, Voxel.Builder builder, final double frequency, final double devoInterval) {
     return (Sequence<Double> values, Listener listener) -> {
       int c = 0;
       Grid<SerializableFunction<Double, Double>> functions = Grid.create(shape);
@@ -292,7 +300,6 @@ public class Main extends Worker {
         }
       }
       Controller controller = new TimeFunction(functions);
-      Voxel.Builder builder = Voxel.Builder.create();
       return new VoxelCompound.Description(Grid.create(shape, b -> b ? builder : null), controller);
     };
   }
