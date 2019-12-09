@@ -29,11 +29,13 @@ import it.units.erallab.hmsrobots.util.SerializableFunction;
 import it.units.erallab.hmsrobots.util.Util;
 import it.units.malelab.jgea.Worker;
 import it.units.malelab.jgea.core.Factory;
+import it.units.malelab.jgea.core.Individual;
 import it.units.malelab.jgea.core.Sequence;
 import it.units.malelab.jgea.core.evolver.Evolver;
 import it.units.malelab.jgea.core.evolver.MutationOnly;
 import it.units.malelab.jgea.core.evolver.StandardEvolver;
 import it.units.malelab.jgea.core.evolver.stopcondition.Iterations;
+import it.units.malelab.jgea.core.fitness.ClassificationFitness;
 import it.units.malelab.jgea.core.function.Function;
 import it.units.malelab.jgea.core.function.NonDeterministicFunction;
 import it.units.malelab.jgea.core.genotype.DoubleSequenceFactory;
@@ -41,7 +43,13 @@ import it.units.malelab.jgea.core.listener.Listener;
 import it.units.malelab.jgea.core.listener.MultiFileListenerFactory;
 import it.units.malelab.jgea.core.listener.collector.Basic;
 import it.units.malelab.jgea.core.listener.collector.BestInfo;
+import it.units.malelab.jgea.core.listener.collector.FirstOfNthObjective;
+import it.units.malelab.jgea.core.listener.collector.FirstRankIndividualInfo;
 import it.units.malelab.jgea.core.listener.collector.FunctionOfBest;
+import it.units.malelab.jgea.core.listener.collector.IndividualBasicInfo;
+import it.units.malelab.jgea.core.listener.collector.IndividualDataCollector;
+import it.units.malelab.jgea.core.listener.collector.Item;
+import it.units.malelab.jgea.core.listener.collector.LowestNormalizedSum;
 import it.units.malelab.jgea.core.listener.collector.Population;
 import it.units.malelab.jgea.core.listener.collector.Static;
 import it.units.malelab.jgea.core.operator.GaussianMutation;
@@ -65,6 +73,7 @@ import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 import static it.units.malelab.jgea.core.util.Args.*;
+import java.io.Serializable;
 
 /**
  *
@@ -101,7 +110,10 @@ public class Main extends Worker {
     List<Integer> controlStepIntervals = i(l(a("controlStepInterval", "1")));
     int nPop = i(a("npop", "100"));
     int iterations = i(a("iterations", "200"));
-    List<Locomotion.Metric> metrics = Lists.newArrayList(Locomotion.Metric.TRAVEL_X_RELATIVE_VELOCITY);
+    List<Locomotion.Metric> metrics = Lists.newArrayList(
+            Locomotion.Metric.TRAVEL_X_RELATIVE_VELOCITY,
+            Locomotion.Metric.CENTER_AVG_Y
+    );
     //prepare things
     MultiFileListenerFactory statsListenerFactory = new MultiFileListenerFactory(a("dir", "."), a("fileStats", null));
     MultiFileListenerFactory serializedBestListenerFactory = new MultiFileListenerFactory(a("dir", "."), a("fileSerialized", null));
@@ -224,7 +236,22 @@ public class Main extends Worker {
                               new Static(keys),
                               new Basic(),
                               new Population(),
-                              new BestInfo<>(problem.getFitnessFunction(metrics), "%+5.1f"),
+                              new BestInfo<>(problem.getFitnessFunction(metrics), "%+5.3f"),
+                              new FirstRankIndividualInfo(
+                                      "faster",
+                                      new FirstOfNthObjective<>(0),
+                                      new IndividualBasicInfo<>(problem.getFitnessFunction(metrics), "%+5.3f")
+                              ),
+                              new FirstRankIndividualInfo(
+                                      "lowest",
+                                      new FirstOfNthObjective<>(1),
+                                      new IndividualBasicInfo<>(problem.getFitnessFunction(metrics), "%+5.3f")
+                              ),
+                              new FirstRankIndividualInfo(
+                                      "central",
+                                      new LowestNormalizedSum<>(),
+                                      new IndividualBasicInfo<>(problem.getFitnessFunction(metrics), "%+5.3f")
+                              ),
                               FunctionOfBest.create(
                                       "valid",
                                       problem.getFitnessFunction(Lists.newArrayList(Locomotion.Metric.values())),
@@ -237,9 +264,33 @@ public class Main extends Worker {
                       ).then(serializedBestListenerFactory.build(
                               new Static(keys),
                               new Basic(),
-                              new FunctionOfBest<>("serialized", (VoxelCompound.Description vcd, Listener l) -> {
-                                return Util.lazilySerialize(vcd);
-                              }, 0, "%s")
+                              new FirstRankIndividualInfo(
+                                      "faster",
+                                      new FirstOfNthObjective(0),
+                                      (Individual individual) -> Collections.singletonList(new Item<>(
+                                              "serialized",
+                                              Util.lazilySerialize((Serializable) individual.getSolution()),
+                                              "%s"
+                                      ))
+                              ),
+                              new FirstRankIndividualInfo(
+                                      "lowest",
+                                      new FirstOfNthObjective(1),
+                                      (Individual individual) -> Collections.singletonList(new Item<>(
+                                              "serialized",
+                                              Util.lazilySerialize((Serializable) individual.getSolution()),
+                                              "%s"
+                                      ))
+                              ),
+                              new FirstRankIndividualInfo(
+                                      "central",
+                                      new LowestNormalizedSum<>(),
+                                      (Individual individual) -> Collections.singletonList(new Item<>(
+                                              "serialized",
+                                              Util.lazilySerialize((Serializable) individual.getSolution()),
+                                              "%s"
+                                      ))
+                              )
                       )), executorService));
                     } catch (InterruptedException | ExecutionException ex) {
                       L.log(Level.SEVERE, String.format("Cannot solve problem: %s", ex), ex);
