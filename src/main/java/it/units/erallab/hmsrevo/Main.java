@@ -238,7 +238,7 @@ public class Main extends Worker {
                               new Population(),
                               new BestInfo<>(problem.getFitnessFunction(metrics), "%+5.3f"),
                               new FirstRankIndividualInfo(
-                                      "faster",
+                                      "fastest",
                                       new FirstOfNthObjective<>(0),
                                       new IndividualBasicInfo<>(problem.getFitnessFunction(metrics), "%+5.3f")
                               ),
@@ -265,7 +265,7 @@ public class Main extends Worker {
                               new Static(keys),
                               new Basic(),
                               new FirstRankIndividualInfo(
-                                      "faster",
+                                      "fastest",
                                       new FirstOfNthObjective(0),
                                       (Individual individual) -> Collections.singletonList(new Item<>(
                                               "serialized",
