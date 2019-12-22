@@ -35,7 +35,6 @@ import it.units.malelab.jgea.core.evolver.Evolver;
 import it.units.malelab.jgea.core.evolver.MutationOnly;
 import it.units.malelab.jgea.core.evolver.StandardEvolver;
 import it.units.malelab.jgea.core.evolver.stopcondition.Iterations;
-import it.units.malelab.jgea.core.fitness.ClassificationFitness;
 import it.units.malelab.jgea.core.function.Function;
 import it.units.malelab.jgea.core.function.NonDeterministicFunction;
 import it.units.malelab.jgea.core.genotype.DoubleSequenceFactory;
@@ -47,7 +46,6 @@ import it.units.malelab.jgea.core.listener.collector.FirstOfNthObjective;
 import it.units.malelab.jgea.core.listener.collector.FirstRankIndividualInfo;
 import it.units.malelab.jgea.core.listener.collector.FunctionOfBest;
 import it.units.malelab.jgea.core.listener.collector.IndividualBasicInfo;
-import it.units.malelab.jgea.core.listener.collector.IndividualDataCollector;
 import it.units.malelab.jgea.core.listener.collector.Item;
 import it.units.malelab.jgea.core.listener.collector.LowestNormalizedSum;
 import it.units.malelab.jgea.core.listener.collector.Population;
@@ -58,7 +56,6 @@ import it.units.malelab.jgea.core.operator.SegmentCrossover;
 import it.units.malelab.jgea.core.ranker.ParetoRanker;
 import it.units.malelab.jgea.core.ranker.selector.Tournament;
 import it.units.malelab.jgea.core.ranker.selector.Worst;
-import it.units.malelab.jgea.core.util.Pair;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -74,6 +71,7 @@ import java.util.stream.Collectors;
 
 import static it.units.malelab.jgea.core.util.Args.*;
 import java.io.Serializable;
+import org.apache.commons.lang3.tuple.Pair;
 
 /**
  *
@@ -96,12 +94,53 @@ public class Main extends Worker {
     namedShapes.put("worm", createShape(new int[]{11, 4}));
     namedShapes.put("biped", createShape(new int[]{11, 4}, new int[]{2, 0, 9, 2}));
     namedShapes.put("tripod", createShape(new int[]{11, 4}, new int[]{2, 0, 5, 2}, new int[]{7, 0, 9, 2}));
+    //prepare sensor configurations
+    Map<String, Function<Grid<Boolean>, Grid<List<Pair<Voxel.Sensor, Integer>>>>> namedSensorConfigurations = new LinkedHashMap<>();
+    namedSensorConfigurations.put("xya0Full", (Function<Grid<Boolean>, Grid<List<Pair<Voxel.Sensor, Integer>>>>) (Grid<Boolean> shape, Listener l) -> Grid.create(shape.getW(), shape.getH(), Lists.newArrayList(
+            Pair.of(Voxel.Sensor.X_ROT_VELOCITY, 0),
+            Pair.of(Voxel.Sensor.Y_ROT_VELOCITY, 0),
+            Pair.of(Voxel.Sensor.AREA_RATIO, 0)
+    )));
+    namedSensorConfigurations.put("xya01Full", (Function<Grid<Boolean>, Grid<List<Pair<Voxel.Sensor, Integer>>>>) (Grid<Boolean> shape, Listener l) -> Grid.create(shape.getW(), shape.getH(), Lists.newArrayList(
+            Pair.of(Voxel.Sensor.X_ROT_VELOCITY, 0),
+            Pair.of(Voxel.Sensor.X_ROT_VELOCITY, 1),
+            Pair.of(Voxel.Sensor.Y_ROT_VELOCITY, 0),
+            Pair.of(Voxel.Sensor.Y_ROT_VELOCITY, 1),
+            Pair.of(Voxel.Sensor.AREA_RATIO, 0),
+            Pair.of(Voxel.Sensor.AREA_RATIO, 1)
+    )));
+    namedSensorConfigurations.put("touchSpine0", (Function<Grid<Boolean>, Grid<List<Pair<Voxel.Sensor, Integer>>>>) (final Grid<Boolean> shape, Listener l) -> Grid.create(shape.getW(), shape.getH(), (Integer x, Integer y) -> {
+      List<Pair<Voxel.Sensor, Integer>> sensors = new ArrayList<>();
+      if (y==0) {
+        sensors.add(Pair.of(Voxel.Sensor.TOUCHING, 0));
+      }
+      if (y==shape.getH()-1) {
+        sensors.add(Pair.of(Voxel.Sensor.X_ROT_VELOCITY, 0));
+        sensors.add(Pair.of(Voxel.Sensor.Y_ROT_VELOCITY, 0));
+      }
+      sensors.add(Pair.of(Voxel.Sensor.AREA_RATIO, 0));
+      return sensors;
+    }));
+    namedSensorConfigurations.put("touchSpine01", (Function<Grid<Boolean>, Grid<List<Pair<Voxel.Sensor, Integer>>>>) (final Grid<Boolean> shape, Listener l) -> Grid.create(shape.getW(), shape.getH(), (Integer x, Integer y) -> {
+      List<Pair<Voxel.Sensor, Integer>> sensors = new ArrayList<>();
+      if (y==0) {
+        sensors.add(Pair.of(Voxel.Sensor.TOUCHING, 0));
+      }
+      if (y==shape.getH()-1) {
+        sensors.add(Pair.of(Voxel.Sensor.X_ROT_VELOCITY, 0));
+        sensors.add(Pair.of(Voxel.Sensor.X_ROT_VELOCITY, 1));
+        sensors.add(Pair.of(Voxel.Sensor.Y_ROT_VELOCITY, 0));
+        sensors.add(Pair.of(Voxel.Sensor.Y_ROT_VELOCITY, 1));
+      }
+      sensors.add(Pair.of(Voxel.Sensor.AREA_RATIO, 0));
+      return sensors;
+    }));
     //read parameters
-    int[] runs = ri(a("run", "0:10"));
-    List<String> shapeNames = l(a("shape", "worm,biped,tripod,box10x10"));
-    List<String> terrainNames = l(a("terrain", "flat,uneven5"));
-    List<String> evolverNames = l(a("evolver", "mutationOnly,standard"));
-    List<String> typeNames = l(a("type", "phases,centralizedMLP"));
+    int[] runs = ri(a("run", "0"));
+    List<String> shapeNames = l(a("shape", "tripod")); //worm,biped,tripod,box10x10
+    List<String> terrainNames = l(a("terrain", "flat")); //flat,uneven5
+    List<String> evolverNames = l(a("evolver", "standard")); //mutationOnly,standard
+    List<String> controllerNames = l(a("controller", "phases,centralizedMLP-0.65-xya0Full,centralizedMLP-0.65-xya01Full,centralizedMLP-0.65-touchSpine0,centralizedMLP-0.65-touchSpine01,centralizedMLP-0.1-xya0Full,centralizedMLP-0.1-xya01Full,centralizedMLP-0.1-touchSpine0,centralizedMLP-0.1-touchSpine01"));
     double finalT = d(a("finalT", "60"));
     double minDT = d(a("minDT", "0.015"));
     double maxDT = d(a("maxDT", "0.2"));
@@ -111,8 +150,7 @@ public class Main extends Worker {
     int nPop = i(a("npop", "100"));
     int iterations = i(a("iterations", "200"));
     List<Locomotion.Metric> metrics = Lists.newArrayList(
-            Locomotion.Metric.TRAVEL_X_RELATIVE_VELOCITY,
-            Locomotion.Metric.CENTER_AVG_Y
+            Locomotion.Metric.TRAVEL_X_RELATIVE_VELOCITY
     );
     //prepare things
     MultiFileListenerFactory statsListenerFactory = new MultiFileListenerFactory(a("dir", "."), a("fileStats", null));
@@ -120,9 +158,9 @@ public class Main extends Worker {
     Voxel.Builder builder = Voxel.Builder.create()
             .springF(15d)
             .massLinearDamping(0.5d)
-            .massAngularDamping(0.5d)
+            .massAngularDamping(0.05d)
             .areaRatioOffset(0.2d)
-            .massSideLengthRatio(0.2d)
+            .massSideLengthRatio(0.3d)
             .ropeJointsFlag(false)
             .springScaffoldings(EnumSet.of(
                     Voxel.SpringScaffolding.SIDE_EXTERNAL,
@@ -133,7 +171,7 @@ public class Main extends Worker {
       for (String shapeName : shapeNames) {
         for (String terrainName : terrainNames) {
           for (String evolverName : evolverNames) {
-            for (String typeName : typeNames) {
+            for (String controllerName : controllerNames) {
               for (int controlStepInterval : controlStepIntervals) {
                 for (double mutationSigma : mutationSigmas) {
                   for (double drivingFrequency : drivingFrequencies) {
@@ -150,30 +188,24 @@ public class Main extends Worker {
                     //prepare factory and mapper
                     Factory<Sequence<Double>> factory = null;
                     NonDeterministicFunction<Sequence<Double>, VoxelCompound.Description> mapper = null;
-                    if (typeName.equals("phases") && (shape != null)) {
+                    if (controllerName.startsWith("phases") && (shape != null)) {
                       int voxels = (int) shape.values().stream().filter((b) -> b).count();
                       factory = new DoubleSequenceFactory(-Math.PI, Math.PI, voxels);
                       mapper = getPhaseSinMapper(shape, builder, drivingFrequency);
-                    } else if (typeName.equals("phasesDevo") && (shape != null)) {
+                    } else if (controllerName.startsWith("phasesDevo") && (shape != null)) {
                       int voxels = (int) shape.values().stream().filter((b) -> b).count();
                       factory = new DoubleSequenceFactory(-Math.PI, Math.PI, voxels * 3);
                       mapper = getPhaseSinWithDevoMapper(shape, builder, drivingFrequency, finalT);
-                    } else if (typeName.equals("centralizedMLP") && (shape != null)) {
-                      int voxels = (int) shape.values().stream().filter((b) -> b).count();
-                      List<Voxel.Sensor> sensors = Lists.newArrayList(
-                              Voxel.Sensor.Y_ROT_VELOCITY,
-                              Voxel.Sensor.X_ROT_VELOCITY,
-                              Voxel.Sensor.TOUCHING
-                      );
-                      int[] innerNeurons = new int[]{(int) Math.round(sensors.size() * voxels * 0.65d)};
-                      int params = CentralizedMLP.countParams(
-                              shape,
-                              Grid.create(shape.getW(), shape.getH(), sensors),
-                              innerNeurons
-                      );
+                    } else if (controllerName.startsWith("centralizedMLP") && (shape != null)) {
+                      String sensorConfigurationName = controllerName.split("-")[2];
+                      double innerLayerFactor = Double.parseDouble(controllerName.split("-")[1]);
+                      Grid<List<Pair<Voxel.Sensor, Integer>>> sensorsGrid = namedSensorConfigurations.get(sensorConfigurationName).apply(shape);
+                      int inputs = (int)sensorsGrid.values().stream().filter(l -> l!=null).mapToInt(List::size).sum();
+                      int[] innerNeurons = new int[]{(int) Math.round((double)inputs * innerLayerFactor)};
+                      int params = CentralizedMLP.countParams(shape, sensorsGrid, innerNeurons);
                       factory = new DoubleSequenceFactory(-1d, 1d, params);
-                      mapper = getCentralizedMLPMapper(shape, builder, sensors, drivingFrequency, innerNeurons);
-                    } else if (typeName.equals("shapeMaterials") && shapeName.startsWith("box")) {
+                      mapper = getCentralizedMLPMapper(shape, builder, sensorsGrid, drivingFrequency, innerNeurons);
+                    } else if (controllerName.equals("shapeMaterials") && shapeName.startsWith("box")) {
                       int nGaussians = 5;
                       int nMaterials = 4;
                       int params = nGaussians * nMaterials * 4;
@@ -220,7 +252,7 @@ public class Main extends Worker {
                     Map<String, String> keys = new LinkedHashMap<>();
                     keys.put("evolver", evolverName);
                     keys.put("control.step.interval", Integer.toString(controlStepInterval));
-                    keys.put("type", typeName);
+                    keys.put("controller", controllerName);
                     keys.put("run", Integer.toString(run));
                     keys.put("n.pop", Integer.toString(nPop));
                     keys.put("driving.frequency", Double.toString(drivingFrequency));
@@ -320,7 +352,7 @@ public class Main extends Worker {
     };
   }
 
-  private Function<Sequence<Double>, VoxelCompound.Description> getCentralizedMLPMapper(final Grid<Boolean> shape, Voxel.Builder builder, final List<Voxel.Sensor> sensors, final double frequency, final int[] innerNeurons) {
+  private Function<Sequence<Double>, VoxelCompound.Description> getCentralizedMLPMapper(final Grid<Boolean> shape, Voxel.Builder builder, Grid<List<Pair<Voxel.Sensor, Integer>>> sensorsGrid, final double frequency, final int[] innerNeurons) {
     return (Sequence<Double> values, Listener listener) -> {
       double[] weights = new double[values.size()];
       for (int i = 0; i < values.size(); i++) {
@@ -328,7 +360,7 @@ public class Main extends Worker {
       }
       Controller controller = new CentralizedMLP(
               shape,
-              Grid.create(shape.getW(), shape.getH(), sensors),
+              sensorsGrid,
               innerNeurons,
               weights,
               t -> Math.sin(2d * Math.PI * frequency * t)
@@ -370,10 +402,10 @@ public class Main extends Worker {
             .springScaffoldings(EnumSet.of(Voxel.SpringScaffolding.CENTRAL_CROSS, Voxel.SpringScaffolding.SIDE_EXTERNAL))
             .ropeJointsFlag(false);
     final List<Pair<Voxel.Builder, SerializableFunction<Double, Double>>> materials = Lists.newArrayList(
-            Pair.build(hardBuilder, t -> 0d),
-            Pair.build(softBuilder, t -> 0d),
-            Pair.build(actuatedBuilder, t -> Math.sin(2d * Math.PI * frequency * t)),
-            Pair.build(actuatedBuilder, t -> Math.sin(-2d * Math.PI * frequency * t))
+            Pair.of(hardBuilder, t -> 0d),
+            Pair.of(softBuilder, t -> 0d),
+            Pair.of(actuatedBuilder, t -> Math.sin(2d * Math.PI * frequency * t)),
+            Pair.of(actuatedBuilder, t -> Math.sin(-2d * Math.PI * frequency * t))
     );
     return (Sequence<Double> values, Listener listener) -> {
       //build grid of sum of gaussians for each material
@@ -425,8 +457,8 @@ public class Main extends Worker {
         int x = entry.getX();
         int y = entry.getY();
         if (entry.getValue() != null) {
-          builderGrid.set(x, y, materials.get(entry.getValue()).first());
-          functions.set(x, y, materials.get(entry.getValue()).second());
+          builderGrid.set(x, y, materials.get(entry.getValue()).getLeft());
+          functions.set(x, y, materials.get(entry.getValue()).getRight());
         }
       }
       Controller controller = new TimeFunction(functions);
