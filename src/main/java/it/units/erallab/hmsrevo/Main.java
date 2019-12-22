@@ -43,12 +43,8 @@ import it.units.malelab.jgea.core.listener.Listener;
 import it.units.malelab.jgea.core.listener.MultiFileListenerFactory;
 import it.units.malelab.jgea.core.listener.collector.Basic;
 import it.units.malelab.jgea.core.listener.collector.BestInfo;
-import it.units.malelab.jgea.core.listener.collector.FirstOfNthObjective;
-import it.units.malelab.jgea.core.listener.collector.FirstRankIndividualInfo;
+import it.units.malelab.jgea.core.listener.collector.DataCollector;
 import it.units.malelab.jgea.core.listener.collector.FunctionOfBest;
-import it.units.malelab.jgea.core.listener.collector.IndividualBasicInfo;
-import it.units.malelab.jgea.core.listener.collector.Item;
-import it.units.malelab.jgea.core.listener.collector.LowestNormalizedSum;
 import it.units.malelab.jgea.core.listener.collector.Population;
 import it.units.malelab.jgea.core.listener.collector.Static;
 import it.units.malelab.jgea.core.operator.GaussianMutation;
@@ -71,7 +67,6 @@ import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 import static it.units.malelab.jgea.core.util.Args.*;
-import java.io.Serializable;
 import org.apache.commons.lang3.tuple.Pair;
 
 /**
@@ -95,7 +90,7 @@ public class Main extends Worker {
     namedShapes.put("worm", createShape(new int[]{11, 4}));
     namedShapes.put("biped", createShape(new int[]{11, 4}, new int[]{2, 0, 9, 2}));
     namedShapes.put("tripod", createShape(new int[]{11, 4}, new int[]{2, 0, 5, 2}, new int[]{7, 0, 9, 2}));
-    //prepare sensor configurations
+    //prepare sensor configurations (will be later fixed by removing sensors where no voxels are)
     Map<String, Function<Grid<Boolean>, Grid<List<Pair<Voxel.Sensor, Integer>>>>> namedSensorConfigurations = new LinkedHashMap<>();
     namedSensorConfigurations.put("xya0Full", (Function<Grid<Boolean>, Grid<List<Pair<Voxel.Sensor, Integer>>>>) (Grid<Boolean> shape, Listener l) -> Grid.create(shape.getW(), shape.getH(), Lists.newArrayList(
             Pair.of(Voxel.Sensor.X_ROT_VELOCITY, 0),
@@ -112,10 +107,10 @@ public class Main extends Worker {
     )));
     namedSensorConfigurations.put("touchSpine0", (Function<Grid<Boolean>, Grid<List<Pair<Voxel.Sensor, Integer>>>>) (final Grid<Boolean> shape, Listener l) -> Grid.create(shape.getW(), shape.getH(), (Integer x, Integer y) -> {
       List<Pair<Voxel.Sensor, Integer>> sensors = new ArrayList<>();
-      if (y==0) {
+      if (y == 0) {
         sensors.add(Pair.of(Voxel.Sensor.TOUCHING, 0));
       }
-      if (y==shape.getH()-1) {
+      if (y == shape.getH() - 1) {
         sensors.add(Pair.of(Voxel.Sensor.X_ROT_VELOCITY, 0));
         sensors.add(Pair.of(Voxel.Sensor.Y_ROT_VELOCITY, 0));
       }
@@ -124,10 +119,10 @@ public class Main extends Worker {
     }));
     namedSensorConfigurations.put("touchSpine01", (Function<Grid<Boolean>, Grid<List<Pair<Voxel.Sensor, Integer>>>>) (final Grid<Boolean> shape, Listener l) -> Grid.create(shape.getW(), shape.getH(), (Integer x, Integer y) -> {
       List<Pair<Voxel.Sensor, Integer>> sensors = new ArrayList<>();
-      if (y==0) {
+      if (y == 0) {
         sensors.add(Pair.of(Voxel.Sensor.TOUCHING, 0));
       }
-      if (y==shape.getH()-1) {
+      if (y == shape.getH() - 1) {
         sensors.add(Pair.of(Voxel.Sensor.X_ROT_VELOCITY, 0));
         sensors.add(Pair.of(Voxel.Sensor.X_ROT_VELOCITY, 1));
         sensors.add(Pair.of(Voxel.Sensor.Y_ROT_VELOCITY, 0));
@@ -149,7 +144,8 @@ public class Main extends Worker {
     List<Double> mutationSigmas = d(l(a("mutationSigma", "0.15")));
     List<Integer> controlStepIntervals = i(l(a("controlStepInterval", "1")));
     int nPop = i(a("npop", "100"));
-    int iterations = i(a("iterations", "200"));
+    int iterations = i(a("iterations", "100"));
+    boolean statsToStandardOutput = b(a("stout", "false"));
     List<Locomotion.Metric> metrics = Lists.newArrayList(
             Locomotion.Metric.TRAVEL_X_RELATIVE_VELOCITY
     );
@@ -201,18 +197,27 @@ public class Main extends Worker {
                       String sensorConfigurationName = controllerName.split("-")[2];
                       double innerLayerFactor = Double.parseDouble(controllerName.split("-")[1]);
                       Grid<List<Pair<Voxel.Sensor, Integer>>> sensorsGrid = namedSensorConfigurations.get(sensorConfigurationName).apply(shape);
-                      int inputs = (int)sensorsGrid.values().stream().filter(l -> l!=null).mapToInt(List::size).sum();
-                      int[] innerNeurons = new int[]{(int) Math.round((double)inputs * innerLayerFactor)};
+                      for (Grid.Entry<Boolean> shapeEntry : shape) {
+                        if (!shapeEntry.getValue()) {
+                          sensorsGrid.set(shapeEntry.getX(), shapeEntry.getY(), null);
+                        }
+                      }
+                      int inputs = (int) sensorsGrid.values().stream().filter(l -> l != null).mapToInt(List::size).sum();
+                      int[] innerNeurons = new int[]{(int) Math.round((double) inputs * innerLayerFactor)};
                       int params = CentralizedMLP.countParams(shape, sensorsGrid, innerNeurons);
                       factory = new DoubleSequenceFactory(-1d, 1d, params);
                       mapper = getCentralizedMLPMapper(shape, builder, sensorsGrid, drivingFrequency, innerNeurons);
                     } else if (controllerName.startsWith("distributedMLP") && (shape != null)) {
                       String sensorConfigurationName = controllerName.split("-")[3];
                       int signals = Integer.parseInt(controllerName.split("-")[2]);
-                      double innerLayerFactor = Double.parseDouble(controllerName.split("-")[1]);
+                      int innerLayerNeurons = Integer.parseInt(controllerName.split("-")[1]);
                       Grid<List<Pair<Voxel.Sensor, Integer>>> sensorsGrid = namedSensorConfigurations.get(sensorConfigurationName).apply(shape);
-                      int inputs = (int)sensorsGrid.values().stream().filter(l -> l!=null).mapToInt(List::size).sum();
-                      int[] innerNeurons = new int[]{(int) Math.round((double)inputs * innerLayerFactor)};
+                      for (Grid.Entry<Boolean> shapeEntry : shape) {
+                        if (!shapeEntry.getValue()) {
+                          sensorsGrid.set(shapeEntry.getX(), shapeEntry.getY(), null);
+                        }
+                      }
+                      int[] innerNeurons = new int[]{innerLayerNeurons};
                       int params = DistributedMLP.countParams(shape, sensorsGrid, signals, innerNeurons);
                       factory = new DoubleSequenceFactory(-1d, 1d, params);
                       mapper = getDistributedMLPMapper(shape, builder, sensorsGrid, signals, drivingFrequency, innerNeurons);
@@ -250,7 +255,7 @@ public class Main extends Worker {
                               new ParetoRanker<>(false),
                               mapper,
                               operators,
-                              new Tournament<>(3),
+                              new Tournament<>(Math.max(Math.round(nPop / 30), 2)),
                               new Worst(),
                               nPop,
                               true,
@@ -272,69 +277,44 @@ public class Main extends Worker {
                     keys.put("terrain", terrainName);
                     keys.put("metrics", metrics.stream().map((m) -> m.toString().toLowerCase().replace("_", ".")).collect(Collectors.joining("/")));
                     L.info(String.format("Keys: %s", keys));
+                    //prepare collectors
+                    List<DataCollector> statsCollectors = Lists.newArrayList(
+                            new Static(keys),
+                            new Basic(),
+                            new Population(),
+                            new BestInfo<>(problem.getFitnessFunction(metrics), "%+5.3f"),
+                            FunctionOfBest.create(
+                                    "valid",
+                                    problem.getFitnessFunction(Lists.newArrayList(Locomotion.Metric.values())),
+                                    Arrays.stream(Locomotion.Metric.values()).map((m) -> {
+                                      return m.toString().toLowerCase().replace('_', '.');
+                                    }).collect(Collectors.toList()),
+                                    Collections.nCopies(Locomotion.Metric.values().length, "%+5.1f"),
+                                    100
+                            )
+                    );
+                    List<DataCollector> serializedCollectors = Lists.newArrayList(
+                            new Static(keys),
+                            new Basic(),
+                            FunctionOfBest.create("",
+                                    (VoxelCompound.Description vcd, Listener listener) -> Collections.singletonList(Util.lazilySerialize(vcd)),
+                                    Collections.singletonList("serialized"),
+                                    Collections.singletonList("%s"),
+                                    100
+                            )
+                    );
                     //run evolver
                     Random r = new Random(run);
+                    Listener listener = statsListenerFactory.build(
+                            statsCollectors.toArray(new DataCollector[statsCollectors.size()])
+                    ).then(serializedBestListenerFactory.build(
+                            serializedCollectors.toArray(new DataCollector[serializedCollectors.size()])
+                    ));
+                    if (statsToStandardOutput) {
+                      listener = listener.then(listener(statsCollectors.toArray(new DataCollector[statsCollectors.size()])));
+                    }
                     try {
-                      evolver.solve(problem, r, executorService, Listener.onExecutor(statsListenerFactory.build(
-                              new Static(keys),
-                              new Basic(),
-                              new Population(),
-                              new BestInfo<>(problem.getFitnessFunction(metrics), "%+5.3f"),
-                              new FirstRankIndividualInfo(
-                                      "fastest",
-                                      new FirstOfNthObjective<>(0),
-                                      new IndividualBasicInfo<>(problem.getFitnessFunction(metrics), "%+5.3f")
-                              ),
-                              new FirstRankIndividualInfo(
-                                      "lowest",
-                                      new FirstOfNthObjective<>(1),
-                                      new IndividualBasicInfo<>(problem.getFitnessFunction(metrics), "%+5.3f")
-                              ),
-                              new FirstRankIndividualInfo(
-                                      "central",
-                                      new LowestNormalizedSum<>(),
-                                      new IndividualBasicInfo<>(problem.getFitnessFunction(metrics), "%+5.3f")
-                              ),
-                              FunctionOfBest.create(
-                                      "valid",
-                                      problem.getFitnessFunction(Lists.newArrayList(Locomotion.Metric.values())),
-                                      Arrays.stream(Locomotion.Metric.values()).map((m) -> {
-                                        return m.toString().toLowerCase().replace('_', '.');
-                                      }).collect(Collectors.toList()),
-                                      Collections.nCopies(Locomotion.Metric.values().length, "%+5.1f"),
-                                      0
-                              )
-                      ).then(serializedBestListenerFactory.build(
-                              new Static(keys),
-                              new Basic(),
-                              new FirstRankIndividualInfo(
-                                      "fastest",
-                                      new FirstOfNthObjective(0),
-                                      (Individual individual) -> Collections.singletonList(new Item<>(
-                                              "serialized",
-                                              Util.lazilySerialize((Serializable) individual.getSolution()),
-                                              "%s"
-                                      ))
-                              ),
-                              new FirstRankIndividualInfo(
-                                      "lowest",
-                                      new FirstOfNthObjective(1),
-                                      (Individual individual) -> Collections.singletonList(new Item<>(
-                                              "serialized",
-                                              Util.lazilySerialize((Serializable) individual.getSolution()),
-                                              "%s"
-                                      ))
-                              ),
-                              new FirstRankIndividualInfo(
-                                      "central",
-                                      new LowestNormalizedSum<>(),
-                                      (Individual individual) -> Collections.singletonList(new Item<>(
-                                              "serialized",
-                                              Util.lazilySerialize((Serializable) individual.getSolution()),
-                                              "%s"
-                                      ))
-                              )
-                      )), executorService));
+                      evolver.solve(problem, r, executorService, Listener.onExecutor(listener, executorService));
                     } catch (InterruptedException | ExecutionException ex) {
                       L.log(Level.SEVERE, String.format("Cannot solve problem: %s", ex), ex);
                     }
@@ -379,16 +359,16 @@ public class Main extends Worker {
       return new VoxelCompound.Description(Grid.create(shape, b -> b ? builder : null), controller);
     };
   }
-  
+
   private Function<Sequence<Double>, VoxelCompound.Description> getDistributedMLPMapper(final Grid<Boolean> shape, Voxel.Builder builder, Grid<List<Pair<Voxel.Sensor, Integer>>> sensorsGrid, final int signals, final double frequency, final int[] innerNeurons) {
     return (Sequence<Double> values, Listener listener) -> {
       double[] weights = new double[values.size()];
       for (int i = 0; i < values.size(); i++) {
         weights[i] = values.get(i);
       }
-      int mW = Math.round(shape.getW()/2);
+      int mW = Math.round(shape.getW() / 2);
       Grid<SerializableFunction<Double, Double>> functions = Grid.create(shape.getW(), shape.getH(), (x, y) -> {
-        if (x == mW && y == (shape.getH()-1)){ //top central
+        if (x == mW && y == (shape.getH() - 1)) { //top central
           return t -> Math.sin(2d * Math.PI * frequency * t);
         } else {
           return t -> 0d;
