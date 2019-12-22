@@ -19,6 +19,7 @@ package it.units.erallab.hmsrevo;
 import com.google.common.collect.Lists;
 import it.units.erallab.hmsrobots.controllers.CentralizedMLP;
 import it.units.erallab.hmsrobots.controllers.Controller;
+import it.units.erallab.hmsrobots.controllers.DistributedMLP;
 import it.units.erallab.hmsrobots.controllers.PhaseSin;
 import it.units.erallab.hmsrobots.controllers.TimeFunction;
 import it.units.erallab.hmsrobots.objects.Voxel;
@@ -205,6 +206,16 @@ public class Main extends Worker {
                       int params = CentralizedMLP.countParams(shape, sensorsGrid, innerNeurons);
                       factory = new DoubleSequenceFactory(-1d, 1d, params);
                       mapper = getCentralizedMLPMapper(shape, builder, sensorsGrid, drivingFrequency, innerNeurons);
+                    } else if (controllerName.startsWith("distributedMLP") && (shape != null)) {
+                      String sensorConfigurationName = controllerName.split("-")[3];
+                      int signals = Integer.parseInt(controllerName.split("-")[2]);
+                      double innerLayerFactor = Double.parseDouble(controllerName.split("-")[1]);
+                      Grid<List<Pair<Voxel.Sensor, Integer>>> sensorsGrid = namedSensorConfigurations.get(sensorConfigurationName).apply(shape);
+                      int inputs = (int)sensorsGrid.values().stream().filter(l -> l!=null).mapToInt(List::size).sum();
+                      int[] innerNeurons = new int[]{(int) Math.round((double)inputs * innerLayerFactor)};
+                      int params = DistributedMLP.countParams(shape, sensorsGrid, signals, innerNeurons);
+                      factory = new DoubleSequenceFactory(-1d, 1d, params);
+                      mapper = getDistributedMLPMapper(shape, builder, sensorsGrid, signals, drivingFrequency, innerNeurons);
                     } else if (controllerName.equals("shapeMaterials") && shapeName.startsWith("box")) {
                       int nGaussians = 5;
                       int nMaterials = 4;
@@ -368,6 +379,32 @@ public class Main extends Worker {
       return new VoxelCompound.Description(Grid.create(shape, b -> b ? builder : null), controller);
     };
   }
+  
+  private Function<Sequence<Double>, VoxelCompound.Description> getDistributedMLPMapper(final Grid<Boolean> shape, Voxel.Builder builder, Grid<List<Pair<Voxel.Sensor, Integer>>> sensorsGrid, final int signals, final double frequency, final int[] innerNeurons) {
+    return (Sequence<Double> values, Listener listener) -> {
+      double[] weights = new double[values.size()];
+      for (int i = 0; i < values.size(); i++) {
+        weights[i] = values.get(i);
+      }
+      int mW = Math.round(shape.getW()/2);
+      Grid<SerializableFunction<Double, Double>> functions = Grid.create(shape.getW(), shape.getH(), (x, y) -> {
+        if (x == mW && y == (shape.getH()-1)){ //top central
+          return t -> Math.sin(2d * Math.PI * frequency * t);
+        } else {
+          return t -> 0d;
+        }
+      });
+      Controller controller = new DistributedMLP(
+              shape,
+              functions,
+              sensorsGrid,
+              signals,
+              innerNeurons,
+              weights
+      );
+      return new VoxelCompound.Description(Grid.create(shape, b -> b ? builder : null), controller);
+    };
+  }
 
   private Function<Sequence<Double>, VoxelCompound.Description> getPhaseSinWithDevoMapper(final Grid<Boolean> shape, Voxel.Builder builder, final double frequency, final double devoInterval) {
     return (Sequence<Double> values, Listener listener) -> {
@@ -493,7 +530,7 @@ public class Main extends Worker {
     xs[n + 1] = length;
     ys[0] = borderHeight;
     ys[n + 1] = borderHeight;
-    for (int i = 1; i < n + 2; i++) {
+    for (int i = 1; i < n + 1; i++) {
       xs[i] = 1 + (double) (i - 1) * (length - 2d) / (double) n;
       ys[i] = random.nextDouble() * peak;
     }
