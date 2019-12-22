@@ -45,6 +45,8 @@ import it.units.malelab.jgea.core.listener.collector.Basic;
 import it.units.malelab.jgea.core.listener.collector.BestInfo;
 import it.units.malelab.jgea.core.listener.collector.DataCollector;
 import it.units.malelab.jgea.core.listener.collector.FunctionOfBest;
+import it.units.malelab.jgea.core.listener.collector.IndividualDataCollector;
+import it.units.malelab.jgea.core.listener.collector.Item;
 import it.units.malelab.jgea.core.listener.collector.Population;
 import it.units.malelab.jgea.core.listener.collector.Static;
 import it.units.malelab.jgea.core.operator.GaussianMutation;
@@ -67,6 +69,7 @@ import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 import static it.units.malelab.jgea.core.util.Args.*;
+import java.io.Serializable;
 import org.apache.commons.lang3.tuple.Pair;
 
 /**
@@ -283,25 +286,19 @@ public class Main extends Worker {
                             new Basic(),
                             new Population(),
                             new BestInfo<>(problem.getFitnessFunction(metrics), "%+5.3f"),
-                            FunctionOfBest.create(
+                            new FunctionOfBest<>(
                                     "valid",
                                     problem.getFitnessFunction(Lists.newArrayList(Locomotion.Metric.values())),
                                     Arrays.stream(Locomotion.Metric.values()).map((m) -> {
                                       return m.toString().toLowerCase().replace('_', '.');
                                     }).collect(Collectors.toList()),
-                                    Collections.nCopies(Locomotion.Metric.values().length, "%+5.1f"),
-                                    100
+                                    Collections.singletonList("%+5.3f")
                             )
                     );
                     List<DataCollector> serializedCollectors = Lists.newArrayList(
                             new Static(keys),
                             new Basic(),
-                            FunctionOfBest.create("",
-                                    (VoxelCompound.Description vcd, Listener listener) -> Collections.singletonList(Util.lazilySerialize(vcd)),
-                                    Collections.singletonList("serialized"),
-                                    Collections.singletonList("%s"),
-                                    100
-                            )
+                            new FunctionOfBest("serialized", (Individual individual) -> Collections.singletonList(new Item("description", Util.lazilySerialize((Serializable)individual.getSolution()), "%s")))
                     );
                     //run evolver
                     Random r = new Random(run);
