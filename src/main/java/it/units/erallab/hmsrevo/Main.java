@@ -18,6 +18,7 @@ package it.units.erallab.hmsrevo;
 
 import com.google.common.collect.Lists;
 import it.units.erallab.hmsrobots.controllers.CentralizedMLP;
+import it.units.erallab.hmsrobots.controllers.ClosedLoopController;
 import it.units.erallab.hmsrobots.controllers.Controller;
 import it.units.erallab.hmsrobots.controllers.DistributedMLP;
 import it.units.erallab.hmsrobots.controllers.PhaseSin;
@@ -94,44 +95,62 @@ public class Main extends Worker {
     namedShapes.put("biped", createShape(new int[]{11, 4}, new int[]{2, 0, 9, 2}));
     namedShapes.put("tripod", createShape(new int[]{11, 4}, new int[]{2, 0, 5, 2}, new int[]{7, 0, 9, 2}));
     //prepare sensor configurations (will be later fixed by removing sensors where no voxels are)
-    Map<String, Function<Grid<Boolean>, Grid<List<Pair<Voxel.Sensor, Integer>>>>> namedSensorConfigurations = new LinkedHashMap<>();
-    namedSensorConfigurations.put("xya0Full", (Function<Grid<Boolean>, Grid<List<Pair<Voxel.Sensor, Integer>>>>) (Grid<Boolean> shape, Listener l) -> Grid.create(shape.getW(), shape.getH(), Lists.newArrayList(
-            Pair.of(Voxel.Sensor.X_ROT_VELOCITY, 0),
-            Pair.of(Voxel.Sensor.Y_ROT_VELOCITY, 0),
-            Pair.of(Voxel.Sensor.AREA_RATIO, 0)
+    Map<String, Function<Grid<Boolean>, Grid<List<ClosedLoopController.TimedSensor>>>> namedSensorConfigurations = new LinkedHashMap<>();
+    namedSensorConfigurations.put("xya.0.full", (Function<Grid<Boolean>, Grid<List<ClosedLoopController.TimedSensor>>>) (Grid<Boolean> shape, Listener l) -> Grid.create(shape.getW(), shape.getH(), Lists.newArrayList(
+            new ClosedLoopController.TimedSensor(Voxel.Sensor.X_ROT_VELOCITY, 0),
+            new ClosedLoopController.TimedSensor(Voxel.Sensor.Y_ROT_VELOCITY, 0),
+            new ClosedLoopController.TimedSensor(Voxel.Sensor.AREA_RATIO, 0)
     )));
-    namedSensorConfigurations.put("xya01Full", (Function<Grid<Boolean>, Grid<List<Pair<Voxel.Sensor, Integer>>>>) (Grid<Boolean> shape, Listener l) -> Grid.create(shape.getW(), shape.getH(), Lists.newArrayList(
-            Pair.of(Voxel.Sensor.X_ROT_VELOCITY, 0),
-            Pair.of(Voxel.Sensor.X_ROT_VELOCITY, 1),
-            Pair.of(Voxel.Sensor.Y_ROT_VELOCITY, 0),
-            Pair.of(Voxel.Sensor.Y_ROT_VELOCITY, 1),
-            Pair.of(Voxel.Sensor.AREA_RATIO, 0),
-            Pair.of(Voxel.Sensor.AREA_RATIO, 1)
+    namedSensorConfigurations.put("xya.05m.full", (Function<Grid<Boolean>, Grid<List<ClosedLoopController.TimedSensor>>>) (Grid<Boolean> shape, Listener l) -> Grid.create(shape.getW(), shape.getH(), Lists.newArrayList(
+            new ClosedLoopController.TimedSensor(Voxel.Sensor.X_ROT_VELOCITY, 0, 5, ClosedLoopController.Aggregate.MEAN),
+            new ClosedLoopController.TimedSensor(Voxel.Sensor.Y_ROT_VELOCITY, 0, 5, ClosedLoopController.Aggregate.MEAN),
+            new ClosedLoopController.TimedSensor(Voxel.Sensor.AREA_RATIO, 0, 5, ClosedLoopController.Aggregate.MEAN)
     )));
-    namedSensorConfigurations.put("touchSpine0", (Function<Grid<Boolean>, Grid<List<Pair<Voxel.Sensor, Integer>>>>) (final Grid<Boolean> shape, Listener l) -> Grid.create(shape.getW(), shape.getH(), (Integer x, Integer y) -> {
-      List<Pair<Voxel.Sensor, Integer>> sensors = new ArrayList<>();
+    namedSensorConfigurations.put("xya.05ma.full", (Function<Grid<Boolean>, Grid<List<ClosedLoopController.TimedSensor>>>) (Grid<Boolean> shape, Listener l) -> Grid.create(shape.getW(), shape.getH(), Lists.newArrayList(
+            new ClosedLoopController.TimedSensor(Voxel.Sensor.X_ROT_VELOCITY, 0, 5, ClosedLoopController.Aggregate.MEAN),
+            new ClosedLoopController.TimedSensor(Voxel.Sensor.Y_ROT_VELOCITY, 0, 5, ClosedLoopController.Aggregate.MEAN),
+            new ClosedLoopController.TimedSensor(Voxel.Sensor.AREA_RATIO, 0, 5, ClosedLoopController.Aggregate.MEAN),
+            new ClosedLoopController.TimedSensor(Voxel.Sensor.X_ROT_VELOCITY, 0, 5, ClosedLoopController.Aggregate.DIFF),
+            new ClosedLoopController.TimedSensor(Voxel.Sensor.Y_ROT_VELOCITY, 0, 5, ClosedLoopController.Aggregate.DIFF),
+            new ClosedLoopController.TimedSensor(Voxel.Sensor.AREA_RATIO, 0, 5, ClosedLoopController.Aggregate.DIFF)
+    )));
+    namedSensorConfigurations.put("spine.0", (Function<Grid<Boolean>, Grid<List<ClosedLoopController.TimedSensor>>>) (final Grid<Boolean> shape, Listener l) -> Grid.create(shape.getW(), shape.getH(), (Integer x, Integer y) -> {
+      List<ClosedLoopController.TimedSensor> sensors = new ArrayList<>();
       if (y == 0) {
-        sensors.add(Pair.of(Voxel.Sensor.TOUCHING, 0));
+        sensors.add(new ClosedLoopController.TimedSensor(Voxel.Sensor.TOUCHING, 0));
       }
       if (y == shape.getH() - 1) {
-        sensors.add(Pair.of(Voxel.Sensor.X_ROT_VELOCITY, 0));
-        sensors.add(Pair.of(Voxel.Sensor.Y_ROT_VELOCITY, 0));
+        sensors.add(new ClosedLoopController.TimedSensor(Voxel.Sensor.X_ROT_VELOCITY, 0));
+        sensors.add(new ClosedLoopController.TimedSensor(Voxel.Sensor.Y_ROT_VELOCITY, 0));
       }
-      sensors.add(Pair.of(Voxel.Sensor.AREA_RATIO, 0));
+      sensors.add(new ClosedLoopController.TimedSensor(Voxel.Sensor.AREA_RATIO, 0));
       return sensors;
     }));
-    namedSensorConfigurations.put("touchSpine01", (Function<Grid<Boolean>, Grid<List<Pair<Voxel.Sensor, Integer>>>>) (final Grid<Boolean> shape, Listener l) -> Grid.create(shape.getW(), shape.getH(), (Integer x, Integer y) -> {
-      List<Pair<Voxel.Sensor, Integer>> sensors = new ArrayList<>();
+    namedSensorConfigurations.put("spine.05m", (Function<Grid<Boolean>, Grid<List<ClosedLoopController.TimedSensor>>>) (final Grid<Boolean> shape, Listener l) -> Grid.create(shape.getW(), shape.getH(), (Integer x, Integer y) -> {
+      List<ClosedLoopController.TimedSensor> sensors = new ArrayList<>();
       if (y == 0) {
-        sensors.add(Pair.of(Voxel.Sensor.TOUCHING, 0));
+        sensors.add(new ClosedLoopController.TimedSensor(Voxel.Sensor.TOUCHING, 0, 5, ClosedLoopController.Aggregate.MEAN));
       }
       if (y == shape.getH() - 1) {
-        sensors.add(Pair.of(Voxel.Sensor.X_ROT_VELOCITY, 0));
-        sensors.add(Pair.of(Voxel.Sensor.X_ROT_VELOCITY, 1));
-        sensors.add(Pair.of(Voxel.Sensor.Y_ROT_VELOCITY, 0));
-        sensors.add(Pair.of(Voxel.Sensor.Y_ROT_VELOCITY, 1));
+        sensors.add(new ClosedLoopController.TimedSensor(Voxel.Sensor.X_ROT_VELOCITY, 0, 5, ClosedLoopController.Aggregate.MEAN));
+        sensors.add(new ClosedLoopController.TimedSensor(Voxel.Sensor.Y_ROT_VELOCITY, 0, 5, ClosedLoopController.Aggregate.MEAN));
       }
-      sensors.add(Pair.of(Voxel.Sensor.AREA_RATIO, 0));
+      sensors.add(new ClosedLoopController.TimedSensor(Voxel.Sensor.AREA_RATIO, 0, 5, ClosedLoopController.Aggregate.MEAN));
+      return sensors;
+    }));
+    namedSensorConfigurations.put("spine.05ma", (Function<Grid<Boolean>, Grid<List<ClosedLoopController.TimedSensor>>>) (final Grid<Boolean> shape, Listener l) -> Grid.create(shape.getW(), shape.getH(), (Integer x, Integer y) -> {
+      List<ClosedLoopController.TimedSensor> sensors = new ArrayList<>();
+      if (y == 0) {
+        sensors.add(new ClosedLoopController.TimedSensor(Voxel.Sensor.TOUCHING, 0, 5, ClosedLoopController.Aggregate.MEAN));
+      }
+      if (y == shape.getH() - 1) {
+        sensors.add(new ClosedLoopController.TimedSensor(Voxel.Sensor.X_ROT_VELOCITY, 0, 5, ClosedLoopController.Aggregate.MEAN));
+        sensors.add(new ClosedLoopController.TimedSensor(Voxel.Sensor.Y_ROT_VELOCITY, 0, 5, ClosedLoopController.Aggregate.MEAN));
+        sensors.add(new ClosedLoopController.TimedSensor(Voxel.Sensor.X_ROT_VELOCITY, 0, 5, ClosedLoopController.Aggregate.DIFF));
+        sensors.add(new ClosedLoopController.TimedSensor(Voxel.Sensor.Y_ROT_VELOCITY, 0, 5, ClosedLoopController.Aggregate.DIFF));
+      }
+      sensors.add(new ClosedLoopController.TimedSensor(Voxel.Sensor.AREA_RATIO, 0, 5, ClosedLoopController.Aggregate.MEAN));
+      sensors.add(new ClosedLoopController.TimedSensor(Voxel.Sensor.AREA_RATIO, 0, 5, ClosedLoopController.Aggregate.DIFF));
       return sensors;
     }));
     //read parameters
@@ -199,7 +218,7 @@ public class Main extends Worker {
                     } else if (controllerName.startsWith("centralizedMLP") && (shape != null)) {
                       String sensorConfigurationName = controllerName.split("-")[2];
                       double innerLayerFactor = Double.parseDouble(controllerName.split("-")[1]);
-                      Grid<List<Pair<Voxel.Sensor, Integer>>> sensorsGrid = namedSensorConfigurations.get(sensorConfigurationName).apply(shape);
+                      Grid<List<ClosedLoopController.TimedSensor>> sensorsGrid = namedSensorConfigurations.get(sensorConfigurationName).apply(shape);
                       for (Grid.Entry<Boolean> shapeEntry : shape) {
                         if (!shapeEntry.getValue()) {
                           sensorsGrid.set(shapeEntry.getX(), shapeEntry.getY(), null);
@@ -214,7 +233,7 @@ public class Main extends Worker {
                       String sensorConfigurationName = controllerName.split("-")[3];
                       int signals = Integer.parseInt(controllerName.split("-")[2]);
                       int innerLayerNeurons = Integer.parseInt(controllerName.split("-")[1]);
-                      Grid<List<Pair<Voxel.Sensor, Integer>>> sensorsGrid = namedSensorConfigurations.get(sensorConfigurationName).apply(shape);
+                      Grid<List<ClosedLoopController.TimedSensor>> sensorsGrid = namedSensorConfigurations.get(sensorConfigurationName).apply(shape);
                       for (Grid.Entry<Boolean> shapeEntry : shape) {
                         if (!shapeEntry.getValue()) {
                           sensorsGrid.set(shapeEntry.getX(), shapeEntry.getY(), null);
@@ -340,7 +359,7 @@ public class Main extends Worker {
     };
   }
 
-  private Function<Sequence<Double>, VoxelCompound.Description> getCentralizedMLPMapper(final Grid<Boolean> shape, Voxel.Builder builder, Grid<List<Pair<Voxel.Sensor, Integer>>> sensorsGrid, final double frequency, final int[] innerNeurons) {
+  private Function<Sequence<Double>, VoxelCompound.Description> getCentralizedMLPMapper(final Grid<Boolean> shape, Voxel.Builder builder, Grid<List<ClosedLoopController.TimedSensor>> sensorsGrid, final double frequency, final int[] innerNeurons) {
     return (Sequence<Double> values, Listener listener) -> {
       double[] weights = new double[values.size()];
       for (int i = 0; i < values.size(); i++) {
@@ -357,7 +376,7 @@ public class Main extends Worker {
     };
   }
 
-  private Function<Sequence<Double>, VoxelCompound.Description> getDistributedMLPMapper(final Grid<Boolean> shape, Voxel.Builder builder, Grid<List<Pair<Voxel.Sensor, Integer>>> sensorsGrid, final int signals, final double frequency, final int[] innerNeurons) {
+  private Function<Sequence<Double>, VoxelCompound.Description> getDistributedMLPMapper(final Grid<Boolean> shape, Voxel.Builder builder, Grid<List<ClosedLoopController.TimedSensor>> sensorsGrid, final int signals, final double frequency, final int[] innerNeurons) {
     return (Sequence<Double> values, Listener listener) -> {
       double[] weights = new double[values.size()];
       for (int i = 0; i < values.size(); i++) {
