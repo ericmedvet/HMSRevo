@@ -23,7 +23,10 @@ import it.units.erallab.hmsrobots.problems.Locomotion;
 import it.units.erallab.hmsrobots.util.Grid;
 import it.units.erallab.hmsrobots.util.Util;
 import it.units.erallab.hmsrobots.viewers.GraphicsDrawer;
-import it.units.erallab.hmsrobots.viewers.VideoGridWriter;
+import it.units.erallab.hmsrobots.viewers.GridEpisodeRunner;
+import it.units.erallab.hmsrobots.viewers.GridFileWriter;
+import it.units.erallab.hmsrobots.viewers.GridOnlineViewer;
+import it.units.erallab.hmsrobots.viewers.GridSnapshotListener;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
@@ -40,6 +43,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.dyn4j.dynamics.Settings;
 
 import static it.units.malelab.jgea.core.util.Args.*;
+import java.util.concurrent.ScheduledExecutorService;
 
 /**
  *
@@ -54,6 +58,7 @@ public class Video {
     String serializedColumnName = a(args, "serializedColumnName", "serialized");
     String inputFile = a(args, "inputFile", "input.txt");
     String outputFile = a(args, "outputFile", "output.mp4");
+    boolean online = b(a(args, "online", "false"));
     String terrain = a(args, "terrain", "flat");
     int w = i(a(args, "w", "800"));
     int h = i(a(args, "h", "600"));
@@ -81,13 +86,14 @@ public class Video {
     //prepare problem
     Locomotion locomotion = new Locomotion(
             finalT,
-            Main.createTerrain(terrain),
+            Locomotion.createTerrain(terrain),
             Lists.newArrayList(Locomotion.Metric.TRAVEL_X_VELOCITY),
             controlStepInterval,
             new Settings()
     );
     fromCSV(
             inputFile,
+            online,
             outputFile,
             w, h, frameRate,
             serializedColumnName,
@@ -97,7 +103,7 @@ public class Video {
     );
   }
 
-  private static <S> void fromCSV(String inputFile, String outputFile, int w, int h, int frameRate, String serializedColumnName, Grid<Map<String, String>> filterGrid, Function<String, S> deserializer, Episode<S, ?> episode) throws IOException {
+  private static <S> void fromCSV(String inputFile, boolean online, String outputFile, int w, int h, int frameRate, String serializedColumnName, Grid<Map<String, String>> filterGrid, Function<String, S> deserializer, Episode<S, ?> episode) throws IOException {
     //read data
     Grid<Pair<String, S>> namedSolutionGrid = Grid.create(filterGrid);
     Reader in = new FileReader(inputFile);
@@ -125,7 +131,7 @@ public class Video {
       }
     }
     for (Grid.Entry<Pair<String, S>> entry : namedSolutionGrid) {
-      if (entry.getValue()==null) {
+      if (entry.getValue() == null) {
         throw new IllegalArgumentException(String.format(
                 "Cell in position (%d,%d) is null because of filter %s",
                 entry.getX(), entry.getY(),
@@ -133,17 +139,25 @@ public class Video {
         ));
       }
     }
-    ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-    VideoGridWriter<S> writer = new VideoGridWriter<>(
+    ScheduledExecutorService uiExecutor = Executors.newScheduledThreadPool(4);
+    ExecutorService executor = online ? Executors.newCachedThreadPool() : Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+    GridSnapshotListener gridSnapshotListener = null;
+    if (online) {
+      gridSnapshotListener = new GridOnlineViewer(Grid.create(namedSolutionGrid, Pair::getLeft), uiExecutor, GraphicsDrawer.RenderingDirectives.create());
+      ((GridOnlineViewer)gridSnapshotListener).start();
+    } else {
+      gridSnapshotListener = new GridFileWriter(w, h, frameRate, new File(outputFile), Grid.create(namedSolutionGrid, Pair::getLeft), uiExecutor, GraphicsDrawer.RenderingDirectives.create());
+    }
+    GridEpisodeRunner<S> runner = new GridEpisodeRunner<>(
             namedSolutionGrid, episode,
-            w, h, frameRate,
-            new File(outputFile),
-            executorService,
-            GraphicsDrawer.RenderingDirectives.create()
+            gridSnapshotListener,
+            executor
     );
-    writer.run();
-    executorService.shutdown();
-    executorService.shutdownNow();
+    runner.run();
+    if (!online) {
+      executor.shutdown();
+      executor.shutdownNow();
+    }
   }
 
   private static Map<String, String> filter(String string) {
