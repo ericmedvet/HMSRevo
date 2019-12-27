@@ -106,7 +106,7 @@ public class Main extends Worker {
             new ClosedLoopController.TimedSensor(Voxel.Sensor.Y_ROT_VELOCITY, 0, 5, ClosedLoopController.Aggregate.MEAN),
             new ClosedLoopController.TimedSensor(Voxel.Sensor.AREA_RATIO, 0, 5, ClosedLoopController.Aggregate.MEAN)
     )));
-    namedSensorConfigurations.put("xya.05ma.full", (Function<Grid<Boolean>, Grid<List<ClosedLoopController.TimedSensor>>>) (Grid<Boolean> shape, Listener l) -> Grid.create(shape.getW(), shape.getH(), Lists.newArrayList(
+    namedSensorConfigurations.put("xya.05md.full", (Function<Grid<Boolean>, Grid<List<ClosedLoopController.TimedSensor>>>) (Grid<Boolean> shape, Listener l) -> Grid.create(shape.getW(), shape.getH(), Lists.newArrayList(
             new ClosedLoopController.TimedSensor(Voxel.Sensor.X_ROT_VELOCITY, 0, 5, ClosedLoopController.Aggregate.MEAN),
             new ClosedLoopController.TimedSensor(Voxel.Sensor.Y_ROT_VELOCITY, 0, 5, ClosedLoopController.Aggregate.MEAN),
             new ClosedLoopController.TimedSensor(Voxel.Sensor.AREA_RATIO, 0, 5, ClosedLoopController.Aggregate.MEAN),
@@ -138,7 +138,7 @@ public class Main extends Worker {
       sensors.add(new ClosedLoopController.TimedSensor(Voxel.Sensor.AREA_RATIO, 0, 5, ClosedLoopController.Aggregate.MEAN));
       return sensors;
     }));
-    namedSensorConfigurations.put("spine.05ma", (Function<Grid<Boolean>, Grid<List<ClosedLoopController.TimedSensor>>>) (final Grid<Boolean> shape, Listener l) -> Grid.create(shape.getW(), shape.getH(), (Integer x, Integer y) -> {
+    namedSensorConfigurations.put("spine.05md", (Function<Grid<Boolean>, Grid<List<ClosedLoopController.TimedSensor>>>) (final Grid<Boolean> shape, Listener l) -> Grid.create(shape.getW(), shape.getH(), (Integer x, Integer y) -> {
       List<ClosedLoopController.TimedSensor> sensors = new ArrayList<>();
       if (y == 0) {
         sensors.add(new ClosedLoopController.TimedSensor(Voxel.Sensor.TOUCHING, 0, 5, ClosedLoopController.Aggregate.MEAN));
@@ -225,7 +225,12 @@ public class Main extends Worker {
                         }
                       }
                       int inputs = (int) sensorsGrid.values().stream().filter(l -> l != null).mapToInt(List::size).sum();
-                      int[] innerNeurons = new int[]{(int) Math.round((double) inputs * innerLayerFactor)};
+                      int[] innerNeurons;
+                      if (innerLayerFactor == 0d) {
+                        innerNeurons = new int[0];
+                      } else {
+                        innerNeurons = new int[]{(int) Math.round((double) inputs * innerLayerFactor)};
+                      }
                       int params = CentralizedMLP.countParams(shape, sensorsGrid, innerNeurons);
                       factory = new DoubleSequenceFactory(-1d, 1d, params);
                       mapper = getCentralizedMLPMapper(shape, builder, sensorsGrid, drivingFrequency, innerNeurons);
@@ -239,7 +244,12 @@ public class Main extends Worker {
                           sensorsGrid.set(shapeEntry.getX(), shapeEntry.getY(), null);
                         }
                       }
-                      int[] innerNeurons = new int[]{innerLayerNeurons};
+                      int[] innerNeurons;
+                      if (innerLayerNeurons == 0) {
+                        innerNeurons = new int[0];
+                      } else {
+                        innerNeurons = new int[]{innerLayerNeurons};
+                      }
                       int params = DistributedMLP.countParams(shape, sensorsGrid, signals, innerNeurons);
                       factory = new DoubleSequenceFactory(-1d, 1d, params);
                       mapper = getDistributedMLPMapper(shape, builder, sensorsGrid, signals, drivingFrequency, innerNeurons);
@@ -317,7 +327,7 @@ public class Main extends Worker {
                     List<DataCollector> serializedCollectors = Lists.newArrayList(
                             new Static(keys),
                             new Basic(),
-                            new FunctionOfBest("serialized", (Individual individual) -> Collections.singletonList(new Item("description", Util.lazilySerialize((Serializable)individual.getSolution()), "%s")))
+                            new FunctionOfBest("serialized", (Individual individual) -> Collections.singletonList(new Item("description", Util.lazilySerialize((Serializable) individual.getSolution()), "%s")))
                     );
                     //run evolver
                     Random r = new Random(run);
