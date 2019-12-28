@@ -17,6 +17,7 @@
 package it.units.erallab.hmsrevo;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Range;
 import it.units.erallab.hmsrobots.controllers.CentralizedMLP;
 import it.units.erallab.hmsrobots.controllers.ClosedLoopController;
 import it.units.erallab.hmsrobots.controllers.Controller;
@@ -279,7 +280,7 @@ public class Main extends Worker {
                       );
                     } else if (evolverName.equals("standard")) {
                       Map<GeneticOperator<Sequence<Double>>, Double> operators = new LinkedHashMap<>();
-                      operators.put(new SegmentCrossover(), 0.8d);
+                      operators.put(new SegmentCrossover(Range.closedOpen(-1d, 2d)), 0.8d);
                       operators.put(new GaussianMutation(mutationSigma), 0.2d);
                       evolver = new StandardEvolver<>(
                               nPop,
