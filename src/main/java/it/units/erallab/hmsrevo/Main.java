@@ -160,7 +160,7 @@ public class Main extends Worker {
     int[] runs = ri(a("run", "0"));
     List<String> shapeNames = l(a("shape", "tripod")); //worm,biped,tripod,box10x10
     List<String> terrainNames = l(a("terrain", "flat")); //flat,uneven5
-    List<String> evolverNames = l(a("evolver", "standard")); //mutationOnly,standard
+    List<String> evolverNames = l(a("evolver", "standard.2op")); //mutationOnly,standard-2op,standard-1op
     List<String> controllerNames = l(a("controller", "centralizedMLP-0-xya.05md.full,centralizedMLP-0.1-xya.05md.full,distributedMLP-0-2-xya.05md.full,distributedMLP-8-2-xya.05md.full,phases"));
     double finalT = d(a("finalT", "60"));
     double minDT = d(a("minDT", "0.015"));
@@ -280,11 +280,16 @@ public class Main extends Worker {
                               0,
                               false
                       );
-                    } else if (evolverName.equals("standard")) {
-                      Map<GeneticOperator<Sequence<Double>>, Double> operators = new LinkedHashMap<>();
+                    } else if (evolverName.startsWith("standard")) {
                       Crossover<Sequence<Double>> crossover = new SegmentCrossover(Range.closedOpen(-1d, 2d));
                       Mutation<Sequence<Double>> mutation = new GaussianMutation(mutationSigma);
-                      operators.put(crossover.andThen(mutation), 1d);
+                      Map<GeneticOperator<Sequence<Double>>, Double> operators = new LinkedHashMap<>();
+                      if (evolverName.split("-")[1].equals("1op")) {
+                        operators.put(crossover.andThen(mutation), 1d);
+                      } else if (evolverName.split("-")[1].equals("2op")) {
+                        operators.put(crossover, 0.8d);
+                        operators.put(mutation, 0.2d);
+                      }
                       evolver = new StandardEvolver<>(
                               nPop,
                               factory,
