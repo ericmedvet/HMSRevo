@@ -46,13 +46,15 @@ import it.units.malelab.jgea.core.listener.MultiFileListenerFactory;
 import it.units.malelab.jgea.core.listener.collector.Basic;
 import it.units.malelab.jgea.core.listener.collector.BestInfo;
 import it.units.malelab.jgea.core.listener.collector.DataCollector;
+import it.units.malelab.jgea.core.listener.collector.Diversity;
 import it.units.malelab.jgea.core.listener.collector.FunctionOfBest;
-import it.units.malelab.jgea.core.listener.collector.IndividualDataCollector;
 import it.units.malelab.jgea.core.listener.collector.Item;
 import it.units.malelab.jgea.core.listener.collector.Population;
 import it.units.malelab.jgea.core.listener.collector.Static;
+import it.units.malelab.jgea.core.operator.Crossover;
 import it.units.malelab.jgea.core.operator.GaussianMutation;
 import it.units.malelab.jgea.core.operator.GeneticOperator;
+import it.units.malelab.jgea.core.operator.Mutation;
 import it.units.malelab.jgea.core.operator.SegmentCrossover;
 import it.units.malelab.jgea.core.ranker.ParetoRanker;
 import it.units.malelab.jgea.core.ranker.selector.Tournament;
@@ -159,7 +161,7 @@ public class Main extends Worker {
     List<String> shapeNames = l(a("shape", "tripod")); //worm,biped,tripod,box10x10
     List<String> terrainNames = l(a("terrain", "flat")); //flat,uneven5
     List<String> evolverNames = l(a("evolver", "standard")); //mutationOnly,standard
-    List<String> controllerNames = l(a("controller", "phases,centralizedMLP-0.65-xya0Full,centralizedMLP-0.65-xya01Full,centralizedMLP-0.65-touchSpine0,centralizedMLP-0.65-touchSpine01,centralizedMLP-0.1-xya0Full,centralizedMLP-0.1-xya01Full,centralizedMLP-0.1-touchSpine0,centralizedMLP-0.1-touchSpine01"));
+    List<String> controllerNames = l(a("controller", "centralizedMLP-0-xya.05md.full,centralizedMLP-0.1-xya.05md.full,distributedMLP-0-2-xya.05md.full,distributedMLP-8-2-xya.05md.full,phases"));
     double finalT = d(a("finalT", "60"));
     double minDT = d(a("minDT", "0.015"));
     double maxDT = d(a("maxDT", "0.2"));
@@ -280,8 +282,9 @@ public class Main extends Worker {
                       );
                     } else if (evolverName.equals("standard")) {
                       Map<GeneticOperator<Sequence<Double>>, Double> operators = new LinkedHashMap<>();
-                      operators.put(new SegmentCrossover(Range.closedOpen(-1d, 2d)), 0.8d);
-                      operators.put(new GaussianMutation(mutationSigma), 0.2d);
+                      Crossover<Sequence<Double>> crossover = new SegmentCrossover(Range.closedOpen(-1d, 2d));
+                      Mutation<Sequence<Double>> mutation = new GaussianMutation(mutationSigma);
+                      operators.put(crossover.andThen(mutation), 1d);
                       evolver = new StandardEvolver<>(
                               nPop,
                               factory,
@@ -315,6 +318,7 @@ public class Main extends Worker {
                             new Static(keys),
                             new Basic(),
                             new Population(),
+                            new Diversity(),
                             new BestInfo<>(problem.getFitnessFunction(metrics), "%+5.3f"),
                             new FunctionOfBest<>(
                                     "valid",
