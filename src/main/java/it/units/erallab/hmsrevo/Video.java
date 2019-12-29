@@ -155,8 +155,8 @@ public class Video {
     );
     runner.run();
     if (!online) {
-      executor.shutdown();
       executor.shutdownNow();
+      uiExecutor.shutdownNow();
     }
   }
 

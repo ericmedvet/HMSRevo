@@ -81,7 +81,7 @@ import org.apache.commons.lang3.tuple.Pair;
  * @author Eric Medvet <eric.medvet@gmail.com>
  */
 public class Main extends Worker {
-
+  
   public Main(String[] args) throws FileNotFoundException {
     super(args);
   }
@@ -170,6 +170,7 @@ public class Main extends Worker {
     List<Integer> controlStepIntervals = i(l(a("controlStepInterval", "1")));
     int nPop = i(a("npop", "100"));
     int iterations = i(a("iterations", "100"));
+    int cacheSize = i(a("cacheSize", "10000"));
     boolean statsToStandardOutput = b(a("stout", "false"));
     List<Locomotion.Metric> metrics = Lists.newArrayList(
             Locomotion.Metric.TRAVEL_X_RELATIVE_VELOCITY
@@ -183,9 +184,10 @@ public class Main extends Worker {
             .massAngularDamping(0.05d)
             .areaRatioOffset(0.2d)
             .massSideLengthRatio(0.3d)
-            .ropeJointsFlag(false)
+            .ropeJointsFlag(true)
             .springScaffoldings(EnumSet.of(
                     Voxel.SpringScaffolding.SIDE_EXTERNAL,
+                    Voxel.SpringScaffolding.SIDE_INTERNAL,
                     Voxel.SpringScaffolding.CENTRAL_CROSS
             ));
     //iterate   
@@ -277,7 +279,7 @@ public class Main extends Worker {
                               mapper,
                               new GaussianMutation(mutationSigma),
                               Lists.newArrayList(new Iterations(iterations)),
-                              0,
+                              cacheSize,
                               false
                       );
                     } else if (evolverName.startsWith("standard")) {
@@ -301,7 +303,7 @@ public class Main extends Worker {
                               nPop,
                               true,
                               Lists.newArrayList(new Iterations(iterations)),
-                              0,
+                              cacheSize,
                               false
                       );
                     }
