@@ -37,6 +37,7 @@ import it.units.malelab.jgea.core.Sequence;
 import it.units.malelab.jgea.core.evolver.Evolver;
 import it.units.malelab.jgea.core.evolver.MutationOnly;
 import it.units.malelab.jgea.core.evolver.StandardEvolver;
+import it.units.malelab.jgea.core.evolver.StandardWithEnforcedDiversity;
 import it.units.malelab.jgea.core.evolver.stopcondition.Iterations;
 import it.units.malelab.jgea.core.function.Function;
 import it.units.malelab.jgea.core.function.NonDeterministicFunction;
@@ -81,7 +82,7 @@ import org.apache.commons.lang3.tuple.Pair;
  * @author Eric Medvet <eric.medvet@gmail.com>
  */
 public class Main extends Worker {
-  
+
   public Main(String[] args) throws FileNotFoundException {
     super(args);
   }
@@ -160,7 +161,7 @@ public class Main extends Worker {
     int[] runs = ri(a("run", "0"));
     List<String> shapeNames = l(a("shape", "tripod")); //worm,biped,tripod,box10x10
     List<String> terrainNames = l(a("terrain", "flat")); //flat,uneven5
-    List<String> evolverNames = l(a("evolver", "standard.2op")); //mutationOnly,standard-2op,standard-1op
+    List<String> evolverNames = l(a("evolver", "standard.2op")); //mutationOnly,standardDiv-1|2op,standard-1|2op
     List<String> controllerNames = l(a("controller", "centralizedMLP-0-xya.05md.full,centralizedMLP-0.1-xya.05md.full,distributedMLP-0-2-xya.05md.full,distributedMLP-8-2-xya.05md.full,phases"));
     double finalT = d(a("finalT", "60"));
     double minDT = d(a("minDT", "0.015"));
@@ -292,20 +293,37 @@ public class Main extends Worker {
                         operators.put(crossover, 0.8d);
                         operators.put(mutation, 0.2d);
                       }
-                      evolver = new StandardEvolver<>(
-                              nPop,
-                              factory,
-                              new ParetoRanker<>(false),
-                              mapper,
-                              operators,
-                              new Tournament<>(Math.max(Math.round(nPop / 30), 2)),
-                              new Worst(),
-                              nPop,
-                              true,
-                              Lists.newArrayList(new Iterations(iterations)),
-                              cacheSize,
-                              false
-                      );
+                      if (evolverName.startsWith("standardDiv")) {
+                        evolver = new StandardWithEnforcedDiversity<>(
+                                100,
+                                nPop,
+                                factory,
+                                new ParetoRanker<>(false),
+                                mapper,
+                                operators,
+                                new Tournament<>(Math.max(Math.round(nPop / 30), 2)),
+                                new Worst(),
+                                nPop,
+                                true,
+                                Lists.newArrayList(new Iterations(iterations)),
+                                cacheSize
+                        );
+                      } else {
+                        evolver = new StandardEvolver<>(
+                                nPop,
+                                factory,
+                                new ParetoRanker<>(false),
+                                mapper,
+                                operators,
+                                new Tournament<>(Math.max(Math.round(nPop / 30), 2)),
+                                new Worst(),
+                                nPop,
+                                true,
+                                Lists.newArrayList(new Iterations(iterations)),
+                                cacheSize,
+                                false
+                        );
+                      }
                     }
                     //prepare keys
                     Map<String, String> keys = new LinkedHashMap<>();
