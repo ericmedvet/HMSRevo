@@ -18,8 +18,8 @@ package it.units.erallab.hmsrevo;
 
 import com.google.common.collect.Lists;
 import it.units.erallab.hmsrobots.objects.VoxelCompound;
-import it.units.erallab.hmsrobots.problems.Episode;
-import it.units.erallab.hmsrobots.problems.Locomotion;
+import it.units.erallab.hmsrobots.episodes.Episode;
+import it.units.erallab.hmsrobots.episodes.Locomotion;
 import it.units.erallab.hmsrobots.util.Grid;
 import it.units.erallab.hmsrobots.util.Util;
 import it.units.erallab.hmsrobots.viewers.GraphicsDrawer;
