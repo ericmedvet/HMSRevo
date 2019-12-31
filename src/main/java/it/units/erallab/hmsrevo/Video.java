@@ -144,7 +144,7 @@ public class Video {
     GridSnapshotListener gridSnapshotListener = null;
     if (online) {
       gridSnapshotListener = new GridOnlineViewer(Grid.create(namedSolutionGrid, Pair::getLeft), uiExecutor, GraphicsDrawer.RenderingDirectives.create());
-      ((GridOnlineViewer)gridSnapshotListener).start();
+      ((GridOnlineViewer)gridSnapshotListener).start(5);
     } else {
       gridSnapshotListener = new GridFileWriter(w, h, frameRate, new File(outputFile), Grid.create(namedSolutionGrid, Pair::getLeft), uiExecutor, GraphicsDrawer.RenderingDirectives.create());
     }

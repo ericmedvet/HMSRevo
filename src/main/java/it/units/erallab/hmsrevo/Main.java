@@ -76,6 +76,7 @@ import java.util.stream.Collectors;
 import static it.units.malelab.jgea.core.util.Args.*;
 import java.io.Serializable;
 import org.apache.commons.lang3.tuple.Pair;
+import org.dyn4j.dynamics.Settings;
 
 /**
  *
@@ -164,8 +165,8 @@ public class Main extends Worker {
     List<String> evolverNames = l(a("evolver", "standard.2op")); //mutationOnly,standardDiv-1|2op,standard-1|2op
     List<String> controllerNames = l(a("controller", "centralizedMLP-0-xya.05md.full,centralizedMLP-0.1-xya.05md.full,distributedMLP-0-2-xya.05md.full,distributedMLP-8-2-xya.05md.full,phases"));
     double finalT = d(a("finalT", "60"));
-    double minDT = d(a("minDT", "0.015"));
-    double maxDT = d(a("maxDT", "0.2"));
+    double minDT = d(a("minDT", "0.0333"));
+    double maxDT = d(a("maxDT", "0.0333"));
     List<Double> drivingFrequencies = d(l(a("drivingF", "-1")));
     List<Double> mutationSigmas = d(l(a("mutationSigma", "0.15")));
     List<Integer> controlStepIntervals = i(l(a("controlStepInterval", "1")));
@@ -180,15 +181,16 @@ public class Main extends Worker {
     MultiFileListenerFactory statsListenerFactory = new MultiFileListenerFactory(a("dir", "."), a("fileStats", null));
     MultiFileListenerFactory serializedBestListenerFactory = new MultiFileListenerFactory(a("dir", "."), a("fileSerialized", null));
     Voxel.Builder builder = Voxel.Builder.create()
-            .springF(15d)
-            .massLinearDamping(0.5d)
-            .massAngularDamping(0.05d)
+            .springF(25d)
+            .massSideLengthRatio(0.05)
+            .massLinearDamping(1d)
+            .massAngularDamping(1d)
+            .restitution(0)
+            .friction(1000)
             .areaRatioOffset(0.2d)
-            .massSideLengthRatio(0.3d)
-            .ropeJointsFlag(true)
+            .ropeJointsFlag(false)
             .springScaffoldings(EnumSet.of(
                     Voxel.SpringScaffolding.SIDE_EXTERNAL,
-                    Voxel.SpringScaffolding.SIDE_INTERNAL,
                     Voxel.SpringScaffolding.CENTRAL_CROSS
             ));
     //iterate   
