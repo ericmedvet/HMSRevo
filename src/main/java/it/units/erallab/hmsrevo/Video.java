@@ -18,8 +18,7 @@ package it.units.erallab.hmsrevo;
 
 import com.google.common.collect.Lists;
 import it.units.erallab.hmsrobots.objects.VoxelCompound;
-import it.units.erallab.hmsrobots.episodes.Episode;
-import it.units.erallab.hmsrobots.episodes.Locomotion;
+import it.units.erallab.hmsrobots.tasks.Locomotion;
 import it.units.erallab.hmsrobots.util.Grid;
 import it.units.erallab.hmsrobots.util.Util;
 import it.units.erallab.hmsrobots.viewers.GraphicsDrawer;
@@ -44,6 +43,7 @@ import org.dyn4j.dynamics.Settings;
 
 import static it.units.malelab.jgea.core.util.Args.*;
 import java.util.concurrent.ScheduledExecutorService;
+import it.units.erallab.hmsrobots.tasks.Task;
 
 /**
  *
@@ -65,6 +65,7 @@ public class Video {
     int frameRate = i(a(args, "frameRate", "25"));
     int controlStepInterval = i(a(args, "controlStepInterval", "1"));
     double finalT = d(a(args, "finalT", "30"));
+    double dT = d(a(args, "dT", "0.01666"));
     //read grid params
     //TODO: fix, doesn't work without filters
     String commonFilter = a(args, "commonFilter", "");
@@ -83,6 +84,8 @@ public class Video {
         filterGrid.set(x, y, filter(filter));
       }
     }
+    Settings settings = new Settings();
+    settings.setStepFrequency(dT);
     //prepare problem
     Locomotion locomotion = new Locomotion(
             finalT,
@@ -103,7 +106,7 @@ public class Video {
     );
   }
 
-  private static <S> void fromCSV(String inputFile, boolean online, String outputFile, int w, int h, int frameRate, String serializedColumnName, Grid<Map<String, String>> filterGrid, Function<String, S> deserializer, Episode<S, ?> episode) throws IOException {
+  private static <S> void fromCSV(String inputFile, boolean online, String outputFile, int w, int h, int frameRate, String serializedColumnName, Grid<Map<String, String>> filterGrid, Function<String, S> deserializer, Task<S, ?> task) throws IOException {
     //read data
     Grid<Pair<String, S>> namedSolutionGrid = Grid.create(filterGrid);
     Reader in = new FileReader(inputFile);
@@ -149,7 +152,7 @@ public class Video {
       gridSnapshotListener = new GridFileWriter(w, h, frameRate, new File(outputFile), Grid.create(namedSolutionGrid, Pair::getLeft), uiExecutor, GraphicsDrawer.RenderingDirectives.create());
     }
     GridEpisodeRunner<S> runner = new GridEpisodeRunner<>(
-            namedSolutionGrid, episode,
+            namedSolutionGrid, task,
             gridSnapshotListener,
             executor
     );

@@ -17,7 +17,7 @@
 package it.units.erallab.hmsrevo;
 
 import it.units.erallab.hmsrobots.objects.VoxelCompound;
-import it.units.erallab.hmsrobots.episodes.Locomotion;
+import it.units.erallab.hmsrobots.tasks.Locomotion;
 import it.units.malelab.jgea.core.function.Function;
 import it.units.malelab.jgea.core.function.NonDeterministicBiFunction;
 import it.units.malelab.jgea.core.function.NonDeterministicFunction;
