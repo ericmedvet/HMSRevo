@@ -74,7 +74,12 @@ import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 import static it.units.malelab.jgea.core.util.Args.*;
+import java.io.File;
+import java.io.PrintStream;
 import java.io.Serializable;
+import java.lang.reflect.InvocationTargetException;
+import java.util.logging.Logger;
+import org.apache.commons.beanutils.PropertyUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.dyn4j.dynamics.Settings;
 
@@ -177,22 +182,26 @@ public class Main extends Worker {
     List<Locomotion.Metric> metrics = Lists.newArrayList(
             Locomotion.Metric.TRAVEL_X_RELATIVE_VELOCITY
     );
+    //set voxel builder
+    Voxel.Builder builder = Voxel.Builder.create();
     //prepare things
     MultiFileListenerFactory statsListenerFactory = new MultiFileListenerFactory(a("dir", "."), a("fileStats", null));
     MultiFileListenerFactory serializedBestListenerFactory = new MultiFileListenerFactory(a("dir", "."), a("fileSerialized", null));
-    Voxel.Builder builder = Voxel.Builder.create()
-            .springF(25d)
-            .massSideLengthRatio(0.05)
-            .massLinearDamping(1d)
-            .massAngularDamping(1d)
-            .restitution(0)
-            .friction(1000)
-            .areaRatioOffset(0.2d)
-            .ropeJointsFlag(false)
-            .springScaffoldings(EnumSet.of(
-                    Voxel.SpringScaffolding.SIDE_EXTERNAL,
-                    Voxel.SpringScaffolding.CENTRAL_CROSS
-            ));
+    //write config
+    if (a("fileConfig", null) != null) {
+      try {
+        Map<String, Object> builderProperties = PropertyUtils.describe(builder);
+        try (PrintStream filePS = new PrintStream(a("dir", "") + File.separator + a("fileConfig", null))) {
+          for (Map.Entry<String, Object> entry : builderProperties.entrySet()) {
+            filePS.printf("%s : %s%n", entry.getKey(), entry.getValue().toString());
+          }
+        }
+      } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException ex) {
+        L.log(Level.SEVERE, String.format("Cannot read builder properties due to %s", ex), ex);
+      } catch (FileNotFoundException ex) {
+        L.log(Level.SEVERE, String.format("Cannot wrtie builder properties on file due to %s", ex), ex);
+      }
+    }
     //iterate   
     for (int run : runs) {
       for (String shapeName : shapeNames) {
@@ -466,16 +475,12 @@ public class Main extends Worker {
 
   private Function<Sequence<Double>, VoxelCompound.Description> getGaussianMixtureShapeMapper(final int w, final int h, final double frequency, final int nGaussian, final double threshold) {
     final Voxel.Builder hardBuilder = Voxel.Builder.create()
-            .springScaffoldings(EnumSet.of(Voxel.SpringScaffolding.CENTRAL_CROSS, Voxel.SpringScaffolding.SIDE_EXTERNAL))
-            .springF(40d)
-            .ropeJointsFlag(false);
+            .springScaffoldings(EnumSet.allOf(Voxel.SpringScaffolding.class))
+            .springF(25d);
     final Voxel.Builder softBuilder = Voxel.Builder.create()
             .springScaffoldings(EnumSet.of(Voxel.SpringScaffolding.CENTRAL_CROSS, Voxel.SpringScaffolding.SIDE_EXTERNAL))
-            .springF(10d)
-            .ropeJointsFlag(false);
-    final Voxel.Builder actuatedBuilder = Voxel.Builder.create()
-            .springScaffoldings(EnumSet.of(Voxel.SpringScaffolding.CENTRAL_CROSS, Voxel.SpringScaffolding.SIDE_EXTERNAL))
-            .ropeJointsFlag(false);
+            .springF(5d);
+    final Voxel.Builder actuatedBuilder = Voxel.Builder.create();
     final List<Pair<Voxel.Builder, SerializableFunction<Double, Double>>> materials = Lists.newArrayList(
             Pair.of(hardBuilder, t -> 0d),
             Pair.of(softBuilder, t -> 0d),
