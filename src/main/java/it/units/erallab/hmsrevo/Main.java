@@ -78,10 +78,8 @@ import java.io.File;
 import java.io.PrintStream;
 import java.io.Serializable;
 import java.lang.reflect.InvocationTargetException;
-import java.util.logging.Logger;
 import org.apache.commons.beanutils.PropertyUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.dyn4j.dynamics.Settings;
 
 /**
  *
@@ -103,7 +101,10 @@ public class Main extends Worker {
     Map<String, Grid<Boolean>> namedShapes = new LinkedHashMap<>();
     namedShapes.put("worm", createShape(new int[]{11, 4}));
     namedShapes.put("biped", createShape(new int[]{11, 4}, new int[]{2, 0, 9, 2}));
-    namedShapes.put("tripod", createShape(new int[]{11, 4}, new int[]{2, 0, 5, 2}, new int[]{7, 0, 9, 2}));
+    namedShapes.put("tripod", createShape(new int[]{11, 4}, new int[]{2, 0, 5, 2}, new int[]{6, 0, 9, 2}));
+    namedShapes.put("worm.small", createShape(new int[]{4, 1}));
+    namedShapes.put("biped.small", createShape(new int[]{4, 2}, new int[]{1, 0, 3, 1}));
+    namedShapes.put("tripod.small", createShape(new int[]{5, 2}, new int[]{1, 0, 2, 1}, new int[]{3, 0, 4, 1}));
     //prepare sensor configurations (will be later fixed by removing sensors where no voxels are)
     Map<String, Function<Grid<Boolean>, Grid<List<ClosedLoopController.TimedSensor>>>> namedSensorConfigurations = new LinkedHashMap<>();
     namedSensorConfigurations.put("xya.0.full", (Function<Grid<Boolean>, Grid<List<ClosedLoopController.TimedSensor>>>) (Grid<Boolean> shape, Listener l) -> Grid.create(shape.getW(), shape.getH(), Lists.newArrayList(
@@ -224,11 +225,11 @@ public class Main extends Worker {
                     //prepare factory and mapper
                     Factory<Sequence<Double>> factory = null;
                     NonDeterministicFunction<Sequence<Double>, VoxelCompound.Description> mapper = null;
-                    if (controllerName.startsWith("phases") && (shape != null)) {
+                    if (controllerName.equals("phases") && (shape != null)) {
                       int voxels = (int) shape.values().stream().filter((b) -> b).count();
                       factory = new DoubleSequenceFactory(-Math.PI, Math.PI, voxels);
                       mapper = getPhaseSinMapper(shape, builder, drivingFrequency);
-                    } else if (controllerName.startsWith("phasesDevo") && (shape != null)) {
+                    } else if (controllerName.equals("phasesDevo") && (shape != null)) {
                       int voxels = (int) shape.values().stream().filter((b) -> b).count();
                       factory = new DoubleSequenceFactory(-Math.PI, Math.PI, voxels * 3);
                       mapper = getPhaseSinWithDevoMapper(shape, builder, drivingFrequency, finalT);
