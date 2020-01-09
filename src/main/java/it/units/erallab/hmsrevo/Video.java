@@ -90,7 +90,7 @@ public class Video {
     Locomotion locomotion = new Locomotion(
             finalT,
             Locomotion.createTerrain(terrain),
-            Lists.newArrayList(Locomotion.Metric.TRAVEL_X_VELOCITY),
+            Lists.newArrayList(Locomotion.Metric.values()),
             controlStepInterval,
             new Settings()
     );
