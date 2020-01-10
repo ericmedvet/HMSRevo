@@ -369,6 +369,7 @@ public class Main extends Worker {
                     List<DataCollector> serializedCollectors = Lists.newArrayList(
                             new Static(keys),
                             new Basic(),
+                            new BestInfo<>(problem.getFitnessFunction(metrics), "%+5.3f"),
                             new FunctionOfBest("serialized", (Individual individual) -> Collections.singletonList(new Item("description", Util.lazilySerialize((Serializable) individual.getSolution()), "%s")))
                     );
                     //run evolver

@@ -44,46 +44,30 @@ import org.dyn4j.dynamics.Settings;
 import static it.units.malelab.jgea.core.util.Args.*;
 import java.util.concurrent.ScheduledExecutorService;
 import it.units.erallab.hmsrobots.tasks.Task;
+import it.units.erallab.hmsrobots.viewers.FramesFileWriter;
 
 /**
  *
  * @author Eric Medvet <eric.medvet@gmail.com>
  */
-public class Video {
+public class FramesImage {
 
-  private static final Logger L = Logger.getLogger(Video.class.getName());
+  private static final Logger L = Logger.getLogger(FramesImage.class.getName());
 
   public static void main(String[] args) throws IOException, ClassNotFoundException {
     //read main params
     String serializedColumnName = a(args, "serializedColumnName", "r0.serialized.description");
     String inputFile = a(args, "inputFile", "input.txt");
-    String outputFile = a(args, "outputFile", "output.mp4");
-    boolean online = b(a(args, "online", "false"));
+    String outputFile = a(args, "outputFile", "image.png");
     String terrain = a(args, "terrain", "flat");
-    int w = i(a(args, "w", "800"));
-    int h = i(a(args, "h", "600"));
-    int frameRate = i(a(args, "frameRate", "30"));
+    int w = i(a(args, "w", "200"));
+    int h = i(a(args, "h", "200"));
     int controlStepInterval = i(a(args, "controlStepInterval", "1"));
-    double finalT = d(a(args, "finalT", "30"));
+    double initialT = d(a(args, "initialT", "5"));
+    double finalT = d(a(args, "finalT", "5.5"));
+    double frameDT = d(a(args, "frameDT", "0.1"));
     double dT = d(a(args, "dT", "0.0333"));
-    //read grid params
-    //TODO: fix, doesn't work without filters
-    String commonFilter = a(args, "commonFilter", "");
-    String xFilters = a(args, "xFilter", "");
-    String yFilters = a(args, "yFilter", "");
-    String[] xFilterValues = xFilters.split(":")[1].split(",");
-    String[] yFilterValues = yFilters.split(":")[1].split(",");
-    String xFilterKey = xFilters.split(":")[0];
-    String yFilterKey = yFilters.split(":")[0];
-    Grid<Map<String, String>> filterGrid = Grid.create(xFilterValues.length, yFilterValues.length);
-    for (int x = 0; x < xFilterValues.length; x++) {
-      for (int y = 0; y < yFilterValues.length; y++) {
-        String filter = commonFilter.replace("#", ";");
-        filter = filter + ";" + xFilterKey + ":" + xFilterValues[x];
-        filter = filter + ";" + yFilterKey + ":" + yFilterValues[y];
-        filterGrid.set(x, y, filter(filter));
-      }
-    }
+    String filterString = a(args, "filter", "");
     Settings settings = new Settings();
     settings.setStepFrequency(dT);
     //prepare problem
@@ -94,16 +78,34 @@ public class Video {
             controlStepInterval,
             new Settings()
     );
-    fromCSV(
-            inputFile,
-            online,
-            outputFile,
-            w, h, frameRate,
-            serializedColumnName,
-            filterGrid,
-            s -> Util.<VoxelCompound.Description>lazilyDeserialize(s),
-            locomotion
-    );
+    //set filter
+    Map<String, String> filter = Video.filter(filterString.replace("#", ";"));
+    //read data
+    Reader in = new FileReader(inputFile);
+    for (CSVRecord record : CSVFormat.DEFAULT.withDelimiter(';').withFirstRecordAsHeader().parse(new FileReader(inputFile))) {
+      String serialized = record.get(serializedColumnName);
+      if (serialized != null) {
+        //check filter
+        boolean met = true;
+        for (Map.Entry<String, String> condition : filter.entrySet()) {
+          met = met && condition.getValue().equals(record.get(condition.getKey()));
+        }
+        //put or replace in grid
+        if (met) {
+          //prepare listener
+          FramesFileWriter framesFileWriter = new FramesFileWriter(
+                  initialT, finalT, frameDT, w, h, FramesFileWriter.Direction.HORIZONTAL,
+                  new File(outputFile),
+                  Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()),
+                  GraphicsDrawer.RenderingDirectives.create()
+          );
+          L.info(String.format("Found record meeting %s", filter));
+          locomotion.apply(Util.<VoxelCompound.Description>lazilyDeserialize(serialized), framesFileWriter);
+          framesFileWriter.flush();
+          break;
+        }
+      }
+    }
   }
 
   private static <S> void fromCSV(String inputFile, boolean online, String outputFile, int w, int h, int frameRate, String serializedColumnName, Grid<Map<String, String>> filterGrid, Function<String, S> deserializer, Task<S, ?> task) throws IOException {
@@ -147,7 +149,7 @@ public class Video {
     GridSnapshotListener gridSnapshotListener = null;
     if (online) {
       gridSnapshotListener = new GridOnlineViewer(Grid.create(namedSolutionGrid, Pair::getLeft), uiExecutor, GraphicsDrawer.RenderingDirectives.create());
-      ((GridOnlineViewer)gridSnapshotListener).start(5);
+      ((GridOnlineViewer) gridSnapshotListener).start(5);
     } else {
       gridSnapshotListener = new GridFileWriter(w, h, frameRate, new File(outputFile), Grid.create(namedSolutionGrid, Pair::getLeft), uiExecutor, GraphicsDrawer.RenderingDirectives.create());
     }
@@ -163,7 +165,7 @@ public class Video {
     }
   }
 
-  public static Map<String, String> filter(String string) {
+  private static Map<String, String> filter(String string) {
     Map<String, String> map = new HashMap<>();
     for (String pair : string.split(";")) {
       if (!pair.trim().isEmpty()) {
